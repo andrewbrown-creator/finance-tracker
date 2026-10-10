@@ -13,7 +13,7 @@ const Engine = new Function(`${match[1]}\nreturn Engine;`)();
 const makeState = (extra = {}) => ({
   settings: { payDay: 15, weekendRule: 'before', weekDay: 1, buffer: 0, ...(extra.settings || {}) },
   bills: extra.bills || [], budgets: extra.budgets || [], transfers: extra.transfers || [],
-  debts: extra.debts || [], savings: extra.savings || { balance: 0 }, months: extra.months || {}
+  debts: extra.debts || [], savings: extra.savings || { balance: 0 }, months: extra.months || {}, adjust: extra.adjust || {}
 });
 const bill = (id, amount, day, more = {}) => ({ id, name: id, amount, day, active: true, ...more });
 const weekly = (id, amount, pot = 'shop') => ({ id, name: id, amount, per: 'week', pot, active: true });
@@ -217,6 +217,66 @@ test('debt projection: interest free, with interest, and never clearing', () => 
   assert.strictEqual(Engine.projectDebt(100000, 24, 10000).months, 12);
   assert.ok(Engine.projectDebt(100000, 24, 1000).never);
   assert.ok(Engine.projectDebt(100000, 0, 0).never);
+});
+
+// ---- One-off changes for a single month ----
+test('a bill can be changed for one date only', () => {
+  const s = makeState({ bills: [bill('Energy', 8000, 1)], adjust: undefined });
+  s.adjust = { 'Energy:2026-11-01': { amount: 9500 } };
+  const oct = Engine.buildPlan(s, '2026-10', '2026-10-15');
+  assert.strictEqual(oct.nextTotal, 9500);
+  assert.ok(oct.next[0].changed);
+  assert.strictEqual(Engine.buildPlan(s, '2026-11', '2026-11-13').nextTotal, 8000); // December back to usual
+});
+test('a skipped bill drops out of that month only, and does not reduce a debt', () => {
+  const s = makeState({
+    bills: [bill('Card', 10600, 8, { debtId: 'cc' })],
+    debts: [{ id: 'cc', name: 'Card', balance: 100000, updated: '2026-10-10', updatedTs: 1 }]
+  });
+  s.adjust = { 'Card:2026-11-08': { skip: true } };
+  const p = Engine.buildPlan(s, '2026-10', '2026-10-15');
+  assert.strictEqual(p.nextTotal, 0);
+  assert.ok(p.next[0].skipped);
+  assert.strictEqual(p.timeline.length, 0);
+  assert.strictEqual(Engine.debtBalance(s.debts[0], s, '2026-12-31'), 100000 - 10600); // only December's went out
+});
+test('pots can be changed or topped up for one month', () => {
+  const s = makeState({
+    budgets: [weekly('Food', 7000), weekly('Spending', 4000, 'spend')],
+    months: { '2026-10': { halifax: 200000, pots: { Spending: 10000 }, potExtras: [{ id: 'xmas', name: 'Christmas food', amount: 6000, pot: 'shop' }] } }
+  });
+  const p = Engine.buildPlan(s, '2026-10', '2026-10-15');
+  assert.strictEqual(p.shop, 7000 * 5 + 6000);
+  assert.strictEqual(p.spend, 10000);
+  assert.ok(p.pots.spend[0].changed);
+});
+test('a one-off payment to a debt counts as money out and is pending until ticked', () => {
+  const s = makeState({
+    transfers: [{ id: 'kid', name: "Daughter's savings", amount: 5000, active: true }],
+    debts: [{ id: 'ley', name: 'Leyla', balance: 55047, updated: '2026-10-10', updatedTs: 1 }],
+    months: { '2026-10': { halifax: 100000, transferAmounts: { kid: 0 }, transferExtras: [{ id: 'l1', name: 'Leyla', amount: 10000, debtId: 'ley' }] } }
+  });
+  const p = Engine.buildPlan(s, '2026-10', '2026-10-15');
+  assert.strictEqual(p.transfersTotal, 10000); // daughter skipped this month, Leyla added
+  assert.strictEqual(p.debtAfter, 55047 - 10000);
+  s.months['2026-10'].ticks = { 'tx:l1': { ts: 5, amount: 10000, debtId: 'ley' } };
+  const ticked = Engine.buildPlan(s, '2026-10', '2026-10-15');
+  assert.strictEqual(ticked.debts[0].now, 45047);
+  assert.strictEqual(ticked.debtAfter, 45047);
+});
+test('a short month can be topped up from savings and still adds up', () => {
+  const s = makeState({
+    bills: [bill('Rent', 115000, 16)], budgets: [weekly('Food', 7000)], savings: { balance: 50000 },
+    months: { '2026-10': { halifax: 240000, fromSavings: 20000 } }
+  });
+  const p = Engine.buildPlan(s, '2026-10', '2026-10-15');
+  // 2,400 - 2,300 kept = 100 free; food 5 x 70 = 350; short 250 before the top-up
+  assert.strictEqual(p.leftover, 10000 + 20000 - 35000);
+  s.months['2026-10'].fromSavings = 25000;
+  const q = Engine.buildPlan(s, '2026-10', '2026-10-15');
+  assert.strictEqual(q.leftover, 0);
+  assert.ok(q.balanced);
+  assert.strictEqual(q.savingsAfter, 25000);
 });
 
 // ---- Mid-month check ----
