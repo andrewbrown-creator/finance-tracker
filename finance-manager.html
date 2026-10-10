@@ -22,6 +22,7 @@
     --good: #1b7a45;     --good-soft: #e4f4ea;
     --bad: #b8322a;      --bad-soft: #fbe8e6;
     --warn: #8a5a00;     --warn-soft: #fdf3df;
+    --series-1: #2a78d6; --series-2: #eb6834;
     --shadow: 0 1px 2px rgba(16,24,40,.05), 0 6px 18px rgba(16,24,40,.05);
   }
   @media (prefers-color-scheme: dark) {
@@ -35,6 +36,7 @@
       --good: #67d497;    --good-soft: #143020;
       --bad: #ff8f85;     --bad-soft: #3a1c1a;
       --warn: #f2c063;    --warn-soft: #352912;
+      --series-1: #3987e5; --series-2: #d95926;
       --shadow: none;
     }
   }
@@ -48,6 +50,7 @@
     --good: #67d497;    --good-soft: #143020;
     --bad: #ff8f85;     --bad-soft: #3a1c1a;
     --warn: #f2c063;    --warn-soft: #352912;
+    --series-1: #3987e5; --series-2: #d95926;
     --shadow: none;
   }
 
@@ -333,6 +336,37 @@
     .cols > .card { break-inside: avoid; display: inline-block; width: 100%; }
     .notice { max-width: none; }
   }
+  /* Progress chart */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .kpi { background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+  .kpi .k-label { font-size: 12.5px; color: var(--muted); font-weight: 650; }
+  .kpi .k-value { font-size: 22px; font-weight: 750; margin-top: 2px; letter-spacing: -.01em; }
+  .kpi .k-note { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13.5px; color: var(--muted); margin: 4px 0 8px; align-items: center; }
+  .legend .key { display: inline-block; width: 16px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 6px; border-radius: 2px; }
+  .legend .key.dash { border-top: 0; height: 2px; background: repeating-linear-gradient(90deg, var(--muted) 0 4px, transparent 4px 7px); }
+  .chart-wrap { position: relative; margin-bottom: 14px; }
+  @media (max-width: 520px) { .kpis { grid-template-columns: 1fr 1fr; } .kpi:nth-child(3) { grid-column: 1 / -1; } }
+  .chart-wrap svg { display: block; width: 100%; overflow: visible; }
+  .chart-wrap svg:focus { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
+  .chart-wrap .ax { fill: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .chart-wrap .grid { stroke: var(--line); stroke-width: 1; }
+  .chart-wrap .ln { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .chart-wrap .s1 { stroke: var(--series-1); } .chart-wrap .f1 { fill: var(--series-1); }
+  .chart-wrap .s2 { stroke: var(--series-2); } .chart-wrap .f2 { fill: var(--series-2); }
+  .chart-wrap .proj { stroke-dasharray: 5 5; }
+  .chart-wrap .ring { stroke: var(--surface); stroke-width: 2; }
+  .chart-wrap .nowline { stroke: var(--muted); stroke-width: 1; }
+  .chart-wrap .cross { stroke: var(--muted); stroke-width: 1; }
+  .chart-wrap .lbl-end { fill: var(--ink); font-size: 12.5px; font-weight: 650; }
+  .chart-tip {
+    position: absolute; top: 0; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.12); padding: 8px 10px; font-size: 13px; min-width: 150px; z-index: 2;
+  }
+  .chart-tip .t-head { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+  .chart-tip .t-row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+  .chart-tip .t-row strong { font-variant-numeric: tabular-nums; }
+  .chart-tip .t-key { display: inline-block; width: 12px; border-top: 2px solid; margin-right: 6px; vertical-align: middle; }
   footer.foot { color: var(--muted); font-size: 12.5px; text-align: center; padding: 8px 0 0; }
 </style>
 </head>
@@ -706,7 +740,72 @@ const Engine = (() => {
     };
   }
 
+  // Savings and debts month by month: what happened (from past plans), now, and a projection
+  // of the next `horizon` paydays if things carry on as they are.
+  function progress(state, today, horizon = 12) {
+    const curId = monthIdFor(today, state);
+    const cur = buildPlan(state, curId, today);
+    const months = state.months || {};
+    let lastPay = 0;
+    for (let i = 0; i < 24 && !lastPay; i++) { const m = months[shiftMonth(curId, -i)]; if (m && m.pay) lastPay = m.pay; }
+
+    const points = Object.keys(months).sort()
+      .filter(id => id < curId && months[id].snapshot && months[id].snapshot.savings != null)
+      .map(id => ({ id, savings: months[id].snapshot.savings, debt: months[id].snapshot.debt, kind: 'past' }));
+
+    const ready = cur.pay > 0 || cur.entered;
+    const ticks = (months[curId] || {}).ticks || {};
+    const bal = {};
+    for (const d of cur.debts) bal[d.id] = d.now;
+    if (ready) {
+      if (cur.extra && !ticks['x:debt']) bal[cur.extraDebt] -= cur.extra;
+      for (const t of cur.transfers) if (t.debtId && !ticks[t.key] && bal[t.debtId] != null) bal[t.debtId] -= t.amount;
+    }
+    const total = () => Object.values(bal).reduce((a, b) => a + Math.max(0, b), 0);
+    let savings = ready ? cur.savingsAfter : cur.savingsNow;
+    points.push({ id: curId, savings, debt: total(), kind: 'now' });
+    let debtFreeId = total() <= 0 ? curId : null;
+
+    let prevId = curId;
+    for (let i = 1; i <= horizon; i++) {
+      const id = shiftMonth(curId, i);
+      // Debt payments and interest between the previous payday and this one
+      const prev = period(prevId, state);
+      const from = i === 1 && today >= prev.payday ? addDays(today, 1) : prev.payday;
+      const out = billsBetween(state, from, prev.end);
+      for (const d of state.debts || []) {
+        if (!(bal[d.id] > 0)) continue;
+        bal[d.id] += Math.round(bal[d.id] * (d.apr || 0) / 100 / 12);
+        for (const l of out) if (l.debtId === d.id) bal[d.id] -= l.amount;
+        bal[d.id] = Math.max(0, bal[d.id]);
+      }
+      // This payday's plan, using last known pay where none is entered yet
+      const m = months[id] || {};
+      const p = buildPlan({ ...state, months: { ...months, [id]: { ...m, pay: m.pay || lastPay } } }, id, today);
+      if (p.extra && bal[p.extraDebt] != null) bal[p.extraDebt] = Math.max(0, bal[p.extraDebt] - p.extra);
+      for (const t of p.transfers) if (t.debtId && bal[t.debtId] != null) bal[t.debtId] = Math.max(0, bal[t.debtId] - t.amount);
+      savings += p.toSavings - p.fromSavings + Math.min(0, p.leftover);
+      points.push({ id, savings, debt: total(), kind: 'future' });
+      if (!debtFreeId && total() <= 0) debtFreeId = id;
+      prevId = id;
+    }
+
+    // Beyond the chart: when would each debt clear on its regular repayment?
+    const unpaid = [];
+    let longest = 0;
+    for (const d of cur.debts) {
+      if (!(d.now > 0)) continue;
+      if (!(d.monthly > 0)) { unpaid.push(d.name); continue; }
+      const pr = projectDebt(d.now, d.apr, d.monthly);
+      if (pr.never) unpaid.push(d.name); else longest = Math.max(longest, pr.months);
+    }
+    if (!debtFreeId && !unpaid.length && longest) debtFreeId = shiftMonth(curId, longest);
+
+    return { points, debtFreeId, unpaid, ready, net: ready ? cur.net : cur.savingsNow - cur.debtTotal, nowId: curId };
+  }
+
   return {
+    progress,
     iso, toDate, fromDate, addDays, diffDays, shiftMonth, daysInMonth, clampDay, monthEnd,
     nominalPayday, paydayOf, monthIdFor, period, weeksIn, datesInRange, billsBetween, owedAt,
     monthlyFor, debtBalance, projectDebt, buildPlan
@@ -717,7 +816,7 @@ const Engine = (() => {
 // ===== APP =====
 const KEY = 'financeManager.v3';
 const SYNC_KEY = 'financeManager.sync';
-const VERSION = '3.1';
+const VERSION = '3.2';
 const DATA_PATH = 'data.json';
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -1481,7 +1580,7 @@ function timelineHtml(p) {
 
 function snapshot(p) {
   const m = month(p.period.id);
-  const snap = { pay: p.pay, halifax: p.halifax, keep: p.keep, free: p.free, monzo: p.monzo, transfers: p.transfersTotal, leftover: p.leftover, toSavings: p.toSavings, extra: p.extra, net: p.net };
+  const snap = { pay: p.pay, halifax: p.halifax, keep: p.keep, free: p.free, monzo: p.monzo, transfers: p.transfersTotal, leftover: p.leftover, toSavings: p.toSavings, extra: p.extra, net: p.net, savings: p.savingsAfter, debt: p.debtAfter };
   if (JSON.stringify(m.snapshot) !== JSON.stringify(snap)) { m.snapshot = snap; save(); }
 }
 
@@ -1538,15 +1637,157 @@ function entryRow(kind, x, meta) {
   </div>`;
 }
 
+// ---------- Progress chart (Debts tab) ----------
+const shortMonth = id => `${MON[Number(id.slice(5)) - 1]}${id.slice(5) === '01' ? ' ' + id.slice(2, 4) : ''}`;
+const compact = p => { const v = p / 100; return Math.abs(v) >= 1000 ? `£${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}K` : `£${Math.round(v)}`; };
+
+function progressCardHtml() {
+  const t = today();
+  const pr = Engine.progress(state, t, 12);
+  view.progress = pr;
+  const hasData = state.debts.length || (state.savings.balance || 0) > 0;
+  if (!hasData) return `<div class="card"><h2>Your progress</h2><p class="empty">Add your savings and debts below to see how they change over time.</p></div>`;
+  const last = pr.points[pr.points.length - 1];
+  let freeVal, freeNote;
+  if (pr.debtFreeId === pr.nowId && !pr.unpaid.length) { freeVal = 'Now'; freeNote = 'Nothing owed'; }
+  else if (pr.unpaid.length) { freeVal = 'Not yet'; freeNote = `${esc(listJoin(pr.unpaid))} ${pr.unpaid.length === 1 ? 'has' : 'have'} no regular repayment`; }
+  else { freeVal = monthLabel(pr.debtFreeId); freeNote = 'On your regular repayments'; }
+  const past = pr.points.filter(x => x.kind === 'past').length;
+  return `<div class="card" style="margin-bottom:14px">
+    <div class="card-head"><h2>Your progress</h2><button class="link" data-action="toggle-progress-table" style="padding:0">${view.progressTable ? 'Show the chart' : 'Show as a table'}</button></div>
+    <div class="kpis">
+      <div class="kpi"><div class="k-label">${pr.net >= 0 ? 'In the black now' : 'In the red now'}</div><div class="k-value" style="color:var(--${pr.net >= 0 ? 'good' : 'bad'})">${money(Math.abs(pr.net))}</div><div class="k-note">Savings against everything owed</div></div>
+      <div class="kpi"><div class="k-label">Debt-free</div><div class="k-value">${freeVal}</div><div class="k-note">${freeNote}</div></div>
+      <div class="kpi"><div class="k-label">Savings by ${monthLabel(last.id)}</div><div class="k-value">${money(last.savings)}</div><div class="k-note">If things carry on as now</div></div>
+    </div>
+    <div class="legend"><span><span class="key" style="border-color:var(--series-1)"></span>Savings</span><span><span class="key" style="border-color:var(--series-2)"></span>Debts</span><span><span class="key dash"></span>Projected</span></div>
+    <div id="progressBody">${view.progressTable ? progressTableHtml(pr) : '<div class="chart-wrap" id="progressChart"></div>'}</div>
+    <p class="hint">${past ? `${plural(past, 'month')} of history from your past paydays. ` : 'History builds up each payday you plan. '}The projection uses your bills, pots and last pay, and assumes no new spending on credit.</p>
+  </div>`;
+}
+
+function progressTableHtml(pr) {
+  return `<div class="table-wrap"><table>
+    <thead><tr><th>Payday</th><th class="amt">Savings</th><th class="amt">Debts</th><th class="amt">Position</th></tr></thead>
+    <tbody>${pr.points.map(x => `<tr class="${x.kind === 'future' ? 'minor' : ''}"><td class="nowrap">${monthLabel(x.id)}${x.kind === 'now' ? ' (now)' : x.kind === 'future' ? ' (projected)' : ''}</td><td class="amt">${money(x.savings)}</td><td class="amt">${money(x.debt)}</td><td class="amt">${x.savings - x.debt < 0 ? '&minus;' : ''}${money(Math.abs(x.savings - x.debt))}</td></tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+function niceStep(max, ticks) {
+  const raw = max / ticks;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  for (const m of [1, 2, 2.5, 5, 10]) if (raw <= m * mag) return m * mag;
+  return 10 * mag;
+}
+
+function drawProgress() {
+  const host = $('#progressChart');
+  if (!host || !view.progress) return;
+  const pts = view.progress.points;
+  const W = host.clientWidth || 600;
+  const narrow = W < 480;
+  const H = narrow ? 220 : 260;
+  const m = { top: 18, right: narrow ? 12 : 92, bottom: 28, left: 46 };
+  const iw = W - m.left - m.right, ih = H - m.top - m.bottom;
+  const maxV = Math.max(1, ...pts.map(x => Math.max(x.savings, x.debt)));
+  const step = niceStep(maxV, 4);
+  const top = Math.ceil(maxV / step) * step;
+  const x = i => m.left + (pts.length === 1 ? iw / 2 : (i * iw) / (pts.length - 1));
+  const y = v => m.top + ih - (Math.max(0, v) / top) * ih;
+  const nowIdx = pts.findIndex(p => p.kind === 'now');
+  const path = (key, a, b) => pts.slice(a, b + 1).map((p, i) => `${i ? 'L' : 'M'}${x(a + i).toFixed(1)},${y(p[key]).toFixed(1)}`).join('');
+  const every = Math.max(1, Math.ceil(pts.length / Math.floor(iw / 46)));
+  let g = '';
+  for (let v = 0; v <= top + 1; v += step) {
+    g += `<line class="grid" x1="${m.left}" x2="${W - m.right}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${m.left - 8}" y="${y(v) + 4}" text-anchor="end">${compact(v)}</text>`;
+  }
+  pts.forEach((p, i) => { if ((((i - Math.max(0, nowIdx)) % every) + every) % every === 0) g += `<text class="ax" x="${x(i)}" y="${H - 8}" text-anchor="middle">${shortMonth(p.id)}</text>`; });
+  g += `<line class="nowline" x1="${x(nowIdx)}" x2="${x(nowIdx)}" y1="${m.top - 6}" y2="${m.top + ih}"/><text class="ax" x="${x(nowIdx) + 4}" y="${m.top - 6}">Now</text>`;
+  const series = [['savings', 1], ['debt', 2]];
+  for (const [key, n] of series) {
+    if (nowIdx > 0) g += `<path class="ln s${n}" d="${path(key, 0, nowIdx)}"/>`;
+    if (nowIdx < pts.length - 1) g += `<path class="ln s${n} proj" d="${path(key, nowIdx, pts.length - 1)}"/>`;
+    g += `<circle class="f${n} ring" cx="${x(nowIdx)}" cy="${y(pts[nowIdx][key])}" r="4"/>`;
+  }
+  // End labels on wider screens, nudged apart only if they would overlap
+  if (!narrow) {
+    const lastI = pts.length - 1;
+    let ys = series.map(([key]) => y(pts[lastI][key]));
+    if (Math.abs(ys[0] - ys[1]) < 16) { const mid = (ys[0] + ys[1]) / 2; ys = ys[0] <= ys[1] ? [mid - 8, mid + 8] : [mid + 8, mid - 8]; }
+    series.forEach(([key, n], k) => {
+      g += `<circle class="f${n} ring" cx="${x(lastI)}" cy="${y(pts[lastI][key])}" r="4"/>`;
+      g += `<text class="lbl-end" x="${x(lastI) + 10}" y="${ys[k] + 4}">${compact(pts[lastI][key])}</text>`;
+    });
+  }
+  const freeIdx = pts.findIndex(p => p.kind === 'future' && p.debt <= 0);
+  if (freeIdx > 0) g += `<text class="ax" x="${x(freeIdx)}" y="${y(0) - 8}" text-anchor="middle">Debt-free</text>`;
+  g += `<g id="crossLayer"></g><rect id="hitLayer" x="${m.left}" y="${m.top}" width="${iw}" height="${ih}" fill="transparent"/>`;
+  host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" tabindex="0" role="img" aria-label="Savings and debts by month, with a projection. Use the arrow keys to read each month.">${g}</svg><div class="chart-tip" id="chartTip" hidden></div>`;
+
+  const svg = host.querySelector('svg');
+  const show = i => {
+    i = Math.max(0, Math.min(pts.length - 1, i));
+    view.chartIdx = i;
+    const p = pts[i];
+    $('#crossLayer').innerHTML = `<line class="cross" x1="${x(i)}" x2="${x(i)}" y1="${m.top}" y2="${m.top + ih}"/>` +
+      series.map(([key, n]) => `<circle class="f${n} ring" cx="${x(i)}" cy="${y(p[key])}" r="4"/>`).join('');
+    const tip = $('#chartTip');
+    tip.textContent = '';
+    const head = document.createElement('div');
+    head.className = 't-head';
+    head.textContent = `${monthLabel(p.id)}${p.kind === 'now' ? ', now' : p.kind === 'future' ? ', projected' : ''}`;
+    tip.appendChild(head);
+    const net = p.savings - p.debt;
+    for (const [label, val, colour] of [['Savings', p.savings, 'var(--series-1)'], ['Debts', p.debt, 'var(--series-2)'], [net >= 0 ? 'In the black' : 'In the red', Math.abs(net), '']]) {
+      const row = document.createElement('div');
+      row.className = 't-row';
+      const name = document.createElement('span');
+      if (colour) { const k = document.createElement('span'); k.className = 't-key'; k.style.borderColor = colour; name.appendChild(k); }
+      name.appendChild(document.createTextNode(label));
+      const v = document.createElement('strong');
+      v.textContent = money(val);
+      row.append(name, v);
+      tip.appendChild(row);
+    }
+    tip.hidden = false;
+    const tw = tip.offsetWidth;
+    const left = x(i) + 12 + tw > W ? x(i) - 12 - tw : x(i) + 12;
+    tip.style.left = `${Math.max(0, left)}px`;
+    tip.style.top = `${m.top}px`;
+  };
+  const hide = () => { $('#crossLayer').innerHTML = ''; $('#chartTip').hidden = true; };
+  const idxAt = evt => {
+    const r = svg.getBoundingClientRect();
+    const px = (evt.clientX - r.left) * (W / r.width);
+    return Math.round(((px - m.left) / iw) * (pts.length - 1));
+  };
+  svg.addEventListener('pointermove', e => show(idxAt(e)));
+  svg.addEventListener('pointerdown', e => show(idxAt(e)));
+  svg.addEventListener('pointerleave', hide);
+  svg.addEventListener('focus', () => show(view.chartIdx != null ? view.chartIdx : nowIdx));
+  svg.addEventListener('blur', hide);
+  svg.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); show((view.chartIdx != null ? view.chartIdx : nowIdx) + (e.key === 'ArrowRight' ? 1 : -1)); }
+  });
+}
+
+let resizeTimer = null;
+window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (view.tab === 'debts' && !view.progressTable) drawProgress(); }, 150); });
+
 // ---------- Debts & savings tab ----------
 function renderDebts() {
+  renderDebtsCards();
+  if (!view.progressTable) drawProgress();
+}
+
+function renderDebtsCards() {
   const el = $('#tab-debts');
   const t = today();
   const debts = state.debts.map(d => ({ ...d, now: Engine.debtBalance(d, state, t), monthly: Engine.monthlyFor(d.id, state) }));
   const totalDebt = debts.reduce((x, d) => x + d.now, 0);
   const sav = state.savings.balance || 0;
   const net = sav - totalDebt;
-  el.innerHTML = `<div class="cols">
+  el.innerHTML = `${progressCardHtml()}<div class="cols">
     <div class="card">
       <h2>Where you stand today</h2>
       ${lineHtml(state.settings.savingsLabel, sav)}
@@ -2007,6 +2248,7 @@ const actions = {
     save(); renderPlan(); toast('Spend pot trimmed for this month');
   },
   'calendar': () => downloadReminder(),
+  'toggle-progress-table': () => { view.progressTable = !view.progressTable; renderTab(); },
   'edit-debt': b => { view.editDebt = view.editDebt === b.dataset.id ? null : b.dataset.id; renderDebts(); },
   'save-debt': b => {
     const d = state.debts.find(x => x.id === b.dataset.id);
