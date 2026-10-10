@@ -1,0 +1,21 @@
+name: Check the maths
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tz: [Europe/London, America/New_York, Pacific/Auckland]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run maths checks (${{ matrix.tz }})
+        run: node tests/engine.test.js
+        env:
+          TZ: ${{ matrix.tz }}

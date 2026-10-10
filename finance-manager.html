@@ -1,0 +1,1751 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#18202e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Finances">
+<title>Finance Manager</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f3f4f7;
+    --surface: #ffffff;
+    --surface-2: #f6f7f9;
+    --ink: #18202e;
+    --muted: #5b6475;
+    --line: #e2e5eb;
+    --accent: #2b59c3;
+    --accent-ink: #ffffff;
+    --halifax: #1f4fbf;  --halifax-soft: #eaf0fd;
+    --monzo: #c8432b;    --monzo-soft: #fdeee9;
+    --transfer: #7d3fa8; --transfer-soft: #f4ecfa;
+    --good: #1b7a45;     --good-soft: #e4f4ea;
+    --bad: #b8322a;      --bad-soft: #fbe8e6;
+    --warn: #8a5a00;     --warn-soft: #fdf3df;
+    --shadow: 0 1px 2px rgba(16,24,40,.05), 0 6px 18px rgba(16,24,40,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0f131a; --surface: #171c25; --surface-2: #1e2430; --ink: #e8ebf1; --muted: #9ba4b3; --line: #2b3241;
+      --accent: #86a8ff; --accent-ink: #0f131a;
+      --halifax: #93b2ff; --halifax-soft: #1a2540;
+      --monzo: #ff9a85;   --monzo-soft: #37201b;
+      --transfer: #d3a4f2; --transfer-soft: #2b1f36;
+      --good: #67d497;    --good-soft: #143020;
+      --bad: #ff8f85;     --bad-soft: #3a1c1a;
+      --warn: #f2c063;    --warn-soft: #352912;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0f131a; --surface: #171c25; --surface-2: #1e2430; --ink: #e8ebf1; --muted: #9ba4b3; --line: #2b3241;
+    --accent: #86a8ff; --accent-ink: #0f131a;
+    --halifax: #93b2ff; --halifax-soft: #1a2540;
+    --monzo: #ff9a85;   --monzo-soft: #37201b;
+    --transfer: #d3a4f2; --transfer-soft: #2b1f36;
+    --good: #67d497;    --good-soft: #143020;
+    --bad: #ff8f85;     --bad-soft: #3a1c1a;
+    --warn: #f2c063;    --warn-soft: #352912;
+    --shadow: none;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+  .num { font-variant-numeric: tabular-nums; }
+  [hidden] { display: none !important; }
+
+  /* Header */
+  header.top {
+    position: sticky; top: 0; z-index: 10; background: var(--surface);
+    border-bottom: 1px solid var(--line); padding-top: env(safe-area-inset-top);
+  }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 10px; padding-bottom: 8px; }
+  .brand { font-weight: 750; font-size: 17px; white-space: nowrap; }
+  .period { display: flex; align-items: center; gap: 6px; }
+  .period-label {
+    background: none; border: 0; color: var(--ink); font: inherit; font-size: 14px; font-weight: 650;
+    line-height: 1.2; text-align: center; min-width: 136px; padding: 2px 4px; cursor: pointer;
+  }
+  .period-label small { display: block; color: var(--muted); font-size: 12px; font-weight: 500; }
+  .nav-btn {
+    width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--surface-2); color: var(--ink); font-size: 20px; line-height: 1; cursor: pointer;
+  }
+  .tabs { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 10px; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button {
+    flex: 1 0 auto; border: 0; background: transparent; color: var(--muted); padding: 8px 12px;
+    border-radius: 999px; font: inherit; font-size: 14px; font-weight: 650; white-space: nowrap; cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { background: var(--ink); color: var(--surface); }
+  @media (max-width: 400px) {
+    .brand { display: none; }
+    .topbar { justify-content: center; }
+    .tabs button { padding: 8px 9px; font-size: 13.5px; }
+  }
+
+  main { padding-top: 16px; padding-bottom: calc(48px + env(safe-area-inset-bottom)); }
+
+  /* Cards */
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+    box-shadow: var(--shadow); padding: 18px; margin-bottom: 14px;
+  }
+  .card h2 { font-size: 17px; margin: 0 0 12px; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .card-head h2 { margin: 0; }
+  .card p { margin: 0 0 10px; }
+  .hint { color: var(--muted); font-size: 13.5px; margin: 6px 0 0; }
+  .empty { color: var(--muted); font-size: 14px; padding: 6px 0; margin: 0; }
+  .muted { color: var(--muted); }
+
+  details.card > summary {
+    cursor: pointer; font-weight: 700; font-size: 16px; list-style: none;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  details.card > summary::-webkit-details-marker { display: none; }
+  details.card > summary::after { content: "\25BE"; color: var(--muted); transition: transform .2s; }
+  details.card[open] > summary { margin-bottom: 12px; }
+  details.card[open] > summary::after { transform: rotate(180deg); }
+  details.card > summary .muted { font-weight: 500; font-size: 14px; margin-left: auto; }
+
+  /* Forms */
+  .field { margin-bottom: 14px; }
+  .field > label, .lbl { display: block; font-size: 14px; font-weight: 650; margin-bottom: 6px; }
+  .money-input {
+    display: flex; align-items: center; border: 1.5px solid var(--line); border-radius: 12px;
+    background: var(--surface-2); padding: 0 12px;
+  }
+  .money-input:focus-within { border-color: var(--accent); }
+  .money-input span { color: var(--muted); font-weight: 650; }
+  .money-input input {
+    border: 0; background: transparent; outline: none; font: inherit; font-size: 17px; padding: 11px 8px;
+    width: 100%; min-width: 0; color: var(--ink); font-variant-numeric: tabular-nums;
+  }
+  .money-input.big input { font-size: 24px; font-weight: 700; padding: 12px 8px; }
+  input[type=text], input[type=number], input[type=date], select {
+    font: inherit; font-size: 16px; color: var(--ink); background: var(--surface-2);
+    border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; width: 100%; min-width: 0;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  @media (max-width: 440px) { .grid2 { grid-template-columns: 1fr; } }
+  label.check { display: flex; align-items: center; gap: 10px; font-weight: 500; font-size: 15px; }
+  label.check input { width: 20px; height: 20px; accent-color: var(--accent); }
+
+  .payday-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14.5px; margin-top: 4px; }
+  .payday-edit { margin-top: 8px; display: grid; gap: 8px; }
+  .total-line {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+    border-top: 1.5px solid var(--line); margin-top: 14px; padding-top: 12px; font-weight: 650;
+  }
+  .total-line strong { font-size: 20px; }
+
+  /* Buttons */
+  .btn {
+    background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 12px; padding: 11px 16px;
+    font: inherit; font-weight: 650; cursor: pointer;
+  }
+  .btn-ghost { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); }
+  .btn-danger { background: var(--bad-soft); color: var(--bad); }
+  .btn-sm { padding: 7px 12px; font-size: 14px; border-radius: 10px; }
+  .link {
+    background: none; border: 0; color: var(--accent); font: inherit; font-size: 14px; font-weight: 650;
+    padding: 6px 0 0; cursor: pointer; text-align: left;
+  }
+  .badge {
+    font: inherit; font-size: 12.5px; font-weight: 700; padding: 5px 10px; border-radius: 999px;
+    background: var(--good-soft); color: var(--good); border: 0; cursor: pointer; white-space: nowrap;
+  }
+  .tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px;
+    background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); vertical-align: 1px;
+  }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+  /* Plan tiles */
+  .tile { border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; border-left: 5px solid; }
+  .tile:last-child { margin-bottom: 0; }
+  .tile-halifax { background: var(--halifax-soft); border-color: var(--halifax); }
+  .tile-monzo { background: var(--monzo-soft); border-color: var(--monzo); }
+  .tile-transfer { background: var(--transfer-soft); border-color: var(--transfer); }
+  .tile-left { background: var(--good-soft); border-color: var(--good); }
+  .tile-left.neg { background: var(--bad-soft); border-color: var(--bad); }
+  .tile-left.waiting { background: var(--surface-2); border-color: var(--line); }
+  .tile-label { font-size: 12.5px; font-weight: 750; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .tile-amount { font-size: 32px; font-weight: 800; margin: 2px 0 2px; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .tile-halifax .tile-amount { color: var(--halifax); }
+  .tile-monzo .tile-amount { color: var(--monzo); }
+  .tile-transfer .tile-amount { color: var(--transfer); }
+  .tile-left .tile-amount { color: var(--good); }
+  .tile-left.neg .tile-amount { color: var(--bad); }
+  .tile-left.waiting .tile-amount { color: var(--muted); font-size: 20px; padding: 6px 0; }
+  .tile-note { font-size: 14px; color: var(--muted); }
+  .lines { margin-top: 6px; }
+  .line {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+    padding: 7px 0; border-top: 1px solid var(--line); font-size: 15px;
+  }
+  .tile .line { border-color: rgba(127,127,127,.18); }
+  .line small, .row-amt small { display: block; color: var(--muted); font-size: 12.5px; font-weight: 500; }
+  .line strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* Notices and results */
+  .notice {
+    border-radius: 14px; padding: 12px 14px; margin-bottom: 14px; font-size: 14.5px;
+    background: var(--warn-soft); border: 1px solid rgba(138,90,0,.18);
+  }
+  .notice.info { background: var(--halifax-soft); border-color: rgba(31,79,191,.18); }
+  .notice .actions { margin-top: 8px; align-items: center; }
+  .result { border-radius: 12px; padding: 10px 12px; font-size: 14.5px; margin-top: 4px; }
+  .result.good { background: var(--good-soft); color: var(--good); }
+  .result.bad { background: var(--bad-soft); color: var(--bad); }
+  .result.warn { background: var(--warn-soft); color: var(--warn); }
+  .result span { color: var(--ink); }
+
+  /* Checklist */
+  .progress-text { font-size: 13.5px; color: var(--muted); font-weight: 600; }
+  .check-item { display: flex; gap: 12px; align-items: flex-start; padding: 11px 0; border-top: 1px solid var(--line); cursor: pointer; }
+  .check-item input { width: 22px; height: 22px; margin: 1px 0 0; accent-color: var(--good); flex-shrink: 0; }
+  .check-item.indent { padding-left: 26px; }
+  .check-text { flex: 1; min-width: 0; }
+  .check-text small { display: block; color: var(--muted); font-size: 13px; }
+  .check-amt { font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .check-item.done .check-text strong, .check-item.done .check-amt { color: var(--muted); text-decoration: line-through; }
+  .sub-head { font-size: 13px; color: var(--muted); font-weight: 650; padding: 8px 0 2px 34px; }
+
+  /* Rows */
+  .row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .row-main { flex: 1; min-width: 0; }
+  .row-name { font-weight: 650; overflow-wrap: anywhere; }
+  .row-meta { font-size: 13px; color: var(--muted); }
+  .row-amt { font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+  .row.paused { opacity: .55; }
+  .group-halifax { border-top: 4px solid var(--halifax); }
+  .group-monzo, .group-shopping, .group-spend { border-top: 4px solid var(--monzo); }
+  .group-transfer { border-top: 4px solid var(--transfer); }
+
+  /* Tables */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 8px 4px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-top: 0; }
+  td.amt, th.amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  tr.past td { color: var(--muted); }
+  tr.total td { font-weight: 750; border-top: 2px solid var(--line); }
+  tr.minor td { color: var(--muted); font-size: 13px; }
+  td.nowrap { white-space: nowrap; }
+  .notes { margin: 12px 0 0; padding-left: 18px; font-size: 14px; color: var(--muted); }
+  .notes li { margin-bottom: 6px; }
+  .ok-line { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--good-soft); color: var(--good); font-weight: 650; font-size: 14.5px; }
+  .bad-line { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--bad-soft); color: var(--bad); font-weight: 650; font-size: 14.5px; }
+
+  /* Debts */
+  .bar { height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; border: 1px solid var(--line); margin: 8px 0 4px; }
+  .bar > span { display: block; height: 100%; background: var(--good); border-radius: 999px; }
+  .big-num { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; margin: 2px 0; }
+  .big-num.good { color: var(--good); }
+  .big-num.bad { color: var(--bad); }
+  .debt-edit { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+
+  /* Dialog */
+  dialog {
+    border: 0; border-radius: 18px; padding: 0; width: min(520px, calc(100vw - 24px));
+    background: var(--surface); color: var(--ink); box-shadow: 0 20px 60px rgba(0,0,0,.35);
+    max-height: calc(100vh - 40px);
+  }
+  dialog::backdrop { background: rgba(10,14,22,.5); }
+  dialog form { padding: 20px; }
+  dialog h3 { margin: 0 0 14px; font-size: 18px; }
+  .dialog-actions { display: flex; gap: 8px; align-items: center; margin-top: 18px; }
+  .dialog-actions .spacer { flex: 1; }
+  .form-error { color: var(--bad); font-size: 14px; font-weight: 600; margin: 4px 0 0; min-height: 1em; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+    background: var(--ink); color: var(--surface); padding: 10px 16px; border-radius: 999px; font-size: 14px;
+    opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 100; max-width: calc(100vw - 32px); text-align: center;
+  }
+  .toast.show { opacity: 1; }
+  footer.foot { color: var(--muted); font-size: 12.5px; text-align: center; padding: 8px 0 0; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap topbar">
+    <div class="brand">Finance Manager</div>
+    <div class="period" id="periodNav">
+      <button class="nav-btn" data-action="prev-cycle" aria-label="Previous pay period">&#8249;</button>
+      <button class="period-label" data-action="this-cycle" id="periodLabel" title="Back to this pay period"></button>
+      <button class="nav-btn" data-action="next-cycle" aria-label="Next pay period">&#8250;</button>
+    </div>
+  </div>
+  <nav class="wrap tabs" role="tablist" aria-label="Sections">
+    <button role="tab" data-tab="payday">Payday</button>
+    <button role="tab" data-tab="out">Money out</button>
+    <button role="tab" data-tab="debts">Debts &amp; savings</button>
+    <button role="tab" data-tab="settings">Settings</button>
+  </nav>
+</header>
+
+<main class="wrap">
+  <section id="tab-payday" role="tabpanel"></section>
+  <section id="tab-out" role="tabpanel" hidden></section>
+  <section id="tab-debts" role="tabpanel" hidden></section>
+  <section id="tab-settings" role="tabpanel" hidden></section>
+</main>
+
+<dialog id="itemDialog" aria-labelledby="itemTitle">
+  <form id="itemForm" novalidate>
+    <h3 id="itemTitle">Add money out</h3>
+    <div class="field">
+      <label for="fName">Name</label>
+      <input type="text" id="fName" name="name" maxlength="60" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="fAmount">Amount</label>
+      <div class="money-input"><span>&pound;</span><input id="fAmount" name="amount" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+    </div>
+    <div class="field">
+      <label for="fFrom">Where it comes from</label>
+      <select id="fFrom" name="from">
+        <option value="halifax">Halifax direct debit or standing order</option>
+        <option value="monzo">Monzo direct debit (Bills pot)</option>
+        <option value="shopping">Monzo Shopping pot (budget)</option>
+        <option value="spend">Monzo Spend pot (budget)</option>
+        <option value="transfer">I move it myself on payday</option>
+      </select>
+    </div>
+    <div class="field" data-show="day">
+      <label for="fDay">Day of the month it comes out</label>
+      <input type="number" id="fDay" name="day" min="1" max="31" inputmode="numeric">
+      <p class="hint">For the 29th, 30th or 31st, shorter months use the last day of the month.</p>
+    </div>
+    <div class="field" data-show="date">
+      <label for="fDate">Date it comes out</label>
+      <input type="date" id="fDate" name="date">
+    </div>
+    <div class="field">
+      <label for="fKind">What is it?</label>
+      <select id="fKind" name="kind">
+        <option value="bill">Bill or subscription</option>
+        <option value="debt">Debt repayment</option>
+        <option value="daughter">Daughter's savings</option>
+        <option value="saving">Other saving</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div class="field" data-show="debt">
+      <label for="fDebt">Which debt does it pay off?</label>
+      <select id="fDebt" name="debtId"></select>
+    </div>
+    <div class="field" data-show="active">
+      <label class="check"><input type="checkbox" name="active"> Include in my plan</label>
+      <p class="hint">Untick to pause something without deleting it.</p>
+    </div>
+    <p class="form-error" id="itemError" role="alert"></p>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-danger btn-sm" data-action="delete-item" id="itemDelete">Delete</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn btn-ghost" data-action="close-dialog">Cancel</button>
+      <button type="submit" class="btn">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+
+// ===== ENGINE START =====
+// All the maths lives here. Money is always whole pence (integers) so totals never drift.
+// Dates are 'YYYY-MM-DD' strings so they compare simply and ignore time zones.
+const Engine = (() => {
+  const pad = n => String(n).padStart(2, '0');
+  const iso = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
+  const nums = s => s.split('-').map(Number);
+  const toDate = s => { const [y, m, d] = nums(s); return new Date(y, m - 1, d, 12); };
+  const fromDate = dt => iso(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
+  const addDays = (s, n) => { const dt = toDate(s); dt.setDate(dt.getDate() + n); return fromDate(dt); };
+  const diffDays = (a, b) => Math.round((toDate(b) - toDate(a)) / 86400000);
+  const daysInMonth = (y, m) => new Date(y, m, 0).getDate();
+  const shiftMonth = (id, n) => {
+    const [y, m] = nums(id);
+    const t = y * 12 + (m - 1) + n;
+    return `${Math.floor(t / 12)}-${pad((t % 12) + 1)}`;
+  };
+  const clampDay = (monthId, day) => {
+    const [y, m] = nums(monthId);
+    return iso(y, m, Math.min(Math.max(1, day | 0), daysInMonth(y, m)));
+  };
+  const sum = list => list.reduce((t, x) => t + (x.amount || 0), 0);
+
+  // The usual payday for a month, moved off weekends if the setting says so.
+  function nominalPayday(id, settings) {
+    let s = clampDay(id, settings.payDay);
+    const w = toDate(s).getDay();
+    if (settings.weekendRule === 'before') {
+      if (w === 6) s = addDays(s, -1);
+      if (w === 0) s = addDays(s, -2);
+    } else if (settings.weekendRule === 'after') {
+      if (w === 6) s = addDays(s, 2);
+      if (w === 0) s = addDays(s, 1);
+    }
+    return s;
+  }
+
+  function paydayOf(id, state) {
+    const c = state.cycles && state.cycles[id];
+    return (c && c.paydayOverride) || nominalPayday(id, state.settings);
+  }
+
+  // Which pay period a date belongs to. A period is named after the month of its payday.
+  function cycleIdFor(date, state) {
+    let id = date.slice(0, 7);
+    if (date < paydayOf(id, state)) id = shiftMonth(id, -1);
+    const next = shiftMonth(id, 1);
+    if (paydayOf(next, state) <= date) id = next;
+    return id;
+  }
+
+  // A pay period runs from payday up to the day before the next payday.
+  function getCycle(id, state) {
+    const start = paydayOf(id, state);
+    const nextPayday = paydayOf(shiftMonth(id, 1), state);
+    return { id, start, nextPayday, end: addDays(nextPayday, -1), days: diffDays(start, nextPayday) };
+  }
+
+  // Every date a monthly payment on `day` falls between `from` and `to` (inclusive).
+  function datesInRange(day, from, to) {
+    const out = [];
+    if (!from || !to || from > to) return out;
+    for (let id = from.slice(0, 7); id <= to.slice(0, 7); id = shiftMonth(id, 1)) {
+      const d = clampDay(id, day);
+      if (d >= from && d <= to) out.push(d);
+    }
+    return out;
+  }
+
+  const isDated = from => from === 'halifax' || from === 'monzo';
+
+  // Regular monthly amount going to a debt from the Money out list.
+  function monthlyFor(debtId, state) {
+    return sum((state.items || []).filter(i => i.active !== false && i.kind === 'debt' && i.debtId === debtId));
+  }
+
+  // Estimated balance: the last statement balance, less direct debits whose date has passed
+  // since then, less payday transfers ticked off since then.
+  function debtBalance(debt, state, until, excludeCycleId) {
+    let bal = debt.balance || 0;
+    if (debt.updated) {
+      const from = addDays(debt.updated, 1);
+      for (const it of state.items || []) {
+        if (it.active === false || it.kind !== 'debt' || it.debtId !== debt.id || !isDated(it.from)) continue;
+        bal -= (it.amount || 0) * datesInRange(it.day, from, until).length;
+      }
+    }
+    for (const [cid, c] of Object.entries(state.cycles || {})) {
+      if (cid === excludeCycleId) continue;
+      for (const o of c.oneOffs || []) {
+        if (o.kind !== 'debt' || o.debtId !== debt.id || !isDated(o.from) || !debt.updated) continue;
+        if (o.date > debt.updated && o.date <= until) bal -= o.amount || 0;
+      }
+      for (const t of Object.values(c.ticks || {})) {
+        if (t && t.debtId === debt.id && (t.ts || 0) > (debt.updatedTs || 0)) bal -= t.amount || 0;
+      }
+    }
+    return Math.max(0, bal);
+  }
+
+  // How many monthly payments until a debt is cleared, and the interest on the way.
+  function projectDebt(balance, apr, monthly) {
+    if (!(balance > 0)) return { months: 0, interest: 0 };
+    if (!(monthly > 0)) return { months: null, interest: 0, never: true };
+    const r = (apr || 0) / 100 / 12;
+    let b = balance, months = 0, interest = 0;
+    while (b > 0) {
+      const i = Math.round(b * r);
+      if (i >= monthly || months >= 600) return { months: null, interest, never: true };
+      b += i - monthly;
+      interest += i;
+      months++;
+    }
+    return { months, interest };
+  }
+
+  // Suggested use of the leftover: fill the safety net first, then a share towards debt.
+  function suggestSplit(leftover, state, debts) {
+    const s = state.settings;
+    const savings = (state.savings && state.savings.balance) || 0;
+    const gap = Math.max(0, (s.safetyNet || 0) - savings);
+    const base = { toSavings: 0, toDebt: 0, debtId: null, gap };
+    if (leftover <= 0) return { ...base, reason: leftover < 0 ? 'short' : 'none' };
+    if (gap >= leftover) return { ...base, toSavings: leftover, reason: 'safety-net' };
+    const open = debts.filter(d => d.room > 0);
+    if (!open.length) return { ...base, toSavings: leftover, reason: 'no-debt' };
+    if (!(s.debtSplitPct > 0)) return { ...base, toSavings: leftover, reason: 'savings-only' };
+    open.sort((a, b) => (b.apr || 0) - (a.apr || 0) || a.room - b.room);
+    const target = open[0];
+    const rest = leftover - gap;
+    let toDebt = Math.floor(rest * Math.min(100, s.debtSplitPct) / 100 / 100) * 100; // whole pounds
+    toDebt = Math.min(toDebt, target.room);
+    return {
+      ...base, toDebt, toSavings: leftover - toDebt, debtId: toDebt > 0 ? target.id : null,
+      reason: toDebt <= 0 ? 'too-small' : (target.apr || 0) > 0 ? 'highest-rate' : 'smallest', targetId: target.id
+    };
+  }
+
+  function applySplit(leftover, sug, override, debts) {
+    if (!override || override.toDebt == null || leftover <= 0) return { ...sug, custom: false };
+    const debt = debts.find(d => d.id === override.debtId) || debts.find(d => d.id === (sug.debtId || sug.targetId));
+    let toDebt = Math.max(0, Math.min(override.toDebt, leftover));
+    toDebt = debt ? Math.min(toDebt, debt.room) : 0;
+    return { ...sug, toDebt, toSavings: leftover - toDebt, debtId: debt && toDebt > 0 ? debt.id : null, custom: true };
+  }
+
+  function buildPlan(state, id, today) {
+    const s = state.settings;
+    const cycle = getCycle(id, state);
+    const c = (state.cycles && state.cycles[id]) || {};
+
+    const income = {
+      pay: c.pay || 0,
+      extras: c.extras == null ? (s.extrasDefault || 0) : c.extras,
+      carried: c.carried || 0
+    };
+    income.total = income.pay + income.extras + income.carried;
+
+    const groups = { halifax: [], monzo: [], shopping: [], spend: [], transfer: [] };
+    const notInCycle = [], twiceInCycle = [], paused = [];
+    const line = (src, date, oneOff) => ({
+      key: (oneOff ? 'o:' : 'i:') + src.id + (date ? ':' + date : ''),
+      id: src.id, name: src.name, amount: src.amount || 0, from: src.from,
+      kind: src.kind || 'bill', debtId: src.kind === 'debt' ? (src.debtId || null) : null,
+      date: date || null, oneOff: !!oneOff
+    });
+
+    for (const it of state.items || []) {
+      if (!groups[it.from] || !(it.amount > 0)) continue;
+      if (it.active === false) { paused.push(it); continue; }
+      if (isDated(it.from)) {
+        const dates = datesInRange(it.day, cycle.start, cycle.end);
+        if (!dates.length) notInCycle.push(it);
+        if (dates.length > 1) twiceInCycle.push({ name: it.name, dates });
+        for (const d of dates) groups[it.from].push(line(it, d));
+      } else {
+        groups[it.from].push(line(it));
+      }
+    }
+    for (const o of c.oneOffs || []) {
+      if (!groups[o.from]) continue;
+      let date = null;
+      if (isDated(o.from)) date = o.date && o.date >= cycle.start && o.date <= cycle.end ? o.date : cycle.start;
+      groups[o.from].push(line(o, date, true));
+    }
+    const byDate = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.name.localeCompare(b.name));
+    groups.halifax.sort(byDate);
+    groups.monzo.sort(byDate);
+
+    const totals = {};
+    for (const k in groups) totals[k] = sum(groups[k]);
+    const buffer = s.buffer || 0;
+    const keep = totals.halifax + buffer;
+    const monzoPots = totals.monzo + totals.shopping + totals.spend;
+    const allocated = keep + monzoPots + totals.transfer;
+    const leftover = income.total - allocated;
+
+    // Regular debt payments in this period
+    const coveredMap = {};
+    for (const k of ['halifax', 'monzo', 'transfer']) {
+      for (const l of groups[k]) if (l.debtId) coveredMap[l.debtId] = (coveredMap[l.debtId] || 0) + l.amount;
+    }
+    const baseUntil = today < cycle.start ? today : addDays(cycle.start, -1);
+    const debts = (state.debts || []).map(d => {
+      const base = debtBalance(d, state, baseUntil, id);
+      return {
+        id: d.id, name: d.name, apr: d.apr || 0,
+        now: debtBalance(d, state, today),
+        base,
+        room: Math.max(0, base - (coveredMap[d.id] || 0)),
+        monthly: monthlyFor(d.id, state)
+      };
+    });
+
+    const suggestion = suggestSplit(leftover, state, debts);
+    const split = applySplit(leftover, suggestion, c.split, debts);
+    const covered = { ...coveredMap };
+    if (split.toDebt > 0 && split.debtId) covered[split.debtId] = (covered[split.debtId] || 0) + split.toDebt;
+    const coveredTotal = Object.values(covered).reduce((t, v) => t + v, 0);
+
+    const daughter = Object.values(groups).flat().filter(l => l.kind === 'daughter').reduce((t, l) => t + l.amount, 0);
+
+    let run = keep;
+    const timeline = groups.halifax.map(l => { run -= l.amount; return { ...l, after: run }; });
+
+    let todayCheck = null;
+    if (today >= cycle.start && today <= cycle.end) {
+      const still = groups.halifax.filter(l => l.date >= today);
+      const dueToday = sum(groups.halifax.filter(l => l.date === today));
+      todayCheck = { required: sum(still) + buffer, count: still.length, dueToday };
+    }
+
+    // Independent cross-check: add up every single line again and compare with what came in.
+    const everyLine = Object.values(groups).flat().reduce((t, l) => t + l.amount, 0);
+    const balanced = everyLine + buffer + leftover === income.total &&
+      (leftover <= 0 || split.toSavings + split.toDebt === leftover);
+
+    return {
+      cycle, income, groups, totals, buffer, keep, monzoPots, allocated, leftover,
+      suggestion, split, debts, covered, coveredTotal, daughter, timeline, todayCheck,
+      notInCycle, twiceInCycle, paused, balanced,
+      isPast: today > cycle.end, isFuture: today < cycle.start
+    };
+  }
+
+  return {
+    iso, toDate, fromDate, addDays, diffDays, shiftMonth, daysInMonth, clampDay,
+    nominalPayday, paydayOf, cycleIdFor, getCycle, datesInRange,
+    monthlyFor, debtBalance, projectDebt, suggestSplit, applySplit, buildPlan
+  };
+})();
+// ===== ENGINE END =====
+
+// ===== APP =====
+const KEY = 'financeManager.v2';
+const VERSION = '2.0';
+
+const FROM = {
+  halifax: { label: 'Halifax direct debits and standing orders', short: 'Halifax', note: 'Stays in Halifax and comes out on the day shown.' },
+  monzo: { label: 'Monzo direct debits', short: 'Monzo Bills pot', note: 'Paid from your Monzo Bills pot, so the money goes there on payday.' },
+  shopping: { label: 'Monzo Shopping pot', short: 'Shopping pot', note: 'Food shop, petrol, haircuts and other essentials.' },
+  spend: { label: 'Monzo Spend pot', short: 'Spend pot', note: 'Your spending money for the month.' },
+  transfer: { label: 'Moved on payday', short: 'Payday transfers', note: "Transfers you make yourself, like your daughter's saver or paying back a friend." }
+};
+const KIND = { bill: 'Bill', debt: 'Debt repayment', daughter: "Daughter's savings", saving: 'Saving', other: 'Other' };
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DOW_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const GBP = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
+const GBP0 = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0, minimumFractionDigits: 0 });
+const money = p => GBP.format((p || 0) / 100);
+const money0 = p => GBP0.format(Math.round((p || 0) / 100));
+const toP = v => {
+  if (v == null || String(v).trim() === '') return null;
+  const n = Number(String(v).replace(/[£,\s]/g, ''));
+  return Number.isFinite(n) ? Math.round(n * 100) : null;
+};
+const toPounds = p => (p == null ? '' : (p / 100).toFixed(2));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const ordinal = n => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+
+const TODAY_OVERRIDE = (() => {
+  try { const t = new URLSearchParams(location.search).get('today'); return /^\d{4}-\d{2}-\d{2}$/.test(t || '') ? t : null; }
+  catch (e) { return null; }
+})();
+const today = () => TODAY_OVERRIDE || Engine.fromDate(new Date());
+
+function fmtDate(s, withYear) {
+  if (!s) return '';
+  const d = Engine.toDate(s);
+  return `${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()]}${withYear ? ' ' + d.getFullYear() : ''}`;
+}
+function fmtShort(s) { const d = Engine.toDate(s); return `${d.getDate()} ${MON[d.getMonth()]}`; }
+function monthLabel(monthId) { const [y, m] = monthId.split('-').map(Number); return `${MONTH[m - 1]} ${y}`; }
+
+// ---------- State ----------
+function defaults() {
+  return {
+    version: 2,
+    settings: {
+      payDay: 15, weekendRule: 'before', buffer: 5000,
+      extrasLabel: 'Work reimbursements', extrasDefault: 0,
+      safetyNet: 100000, debtSplitPct: 50,
+      savingsLabel: 'Monzo savings', savingsInMonzo: true
+    },
+    items: [], debts: [], savings: { balance: 0, updated: '' }, cycles: {},
+    meta: { created: today(), lastBackup: '', migrated: null, migratedAck: false, reviewMonzo: false }
+  };
+}
+
+// Empty starter lines for the pots, skipping any name already in the list.
+function seedPots(s) {
+  const have = new Set(s.items.map(i => i.name.trim().toLowerCase()));
+  const add = (name, from) => { if (!have.has(name.toLowerCase())) s.items.push({ id: uid(), name, amount: 0, from, kind: 'bill', active: true }); };
+  add('Food shop', 'shopping');
+  add('Petrol', 'shopping');
+  add('Haircuts', 'shopping');
+  add('Spending money', 'spend');
+}
+
+function normalise(s) {
+  const d = defaults();
+  s = s && typeof s === 'object' ? s : {};
+  return {
+    version: 2,
+    settings: { ...d.settings, ...(s.settings || {}) },
+    items: Array.isArray(s.items) ? s.items : [],
+    debts: Array.isArray(s.debts) ? s.debts : [],
+    savings: { ...d.savings, ...(s.savings || {}) },
+    cycles: s.cycles && typeof s.cycles === 'object' ? s.cycles : {},
+    meta: { ...d.meta, ...(s.meta || {}) }
+  };
+}
+
+function readStore(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+// Brings data across from the old planner (same web address) without changing it.
+function migrateOld() {
+  let entries = null;
+  try { entries = JSON.parse(readStore('financeEntries') || 'null'); } catch (e) { entries = null; }
+  if (!Array.isArray(entries)) return null;
+  const s = defaults();
+  const t = today(), now = Date.now();
+  let oldDebts = [];
+  try { oldDebts = JSON.parse(readStore('financeDebts') || '[]') || []; } catch (e) { oldDebts = []; }
+  s.debts = oldDebts.filter(d => d && d.name).map(d => {
+    const b = Math.max(0, toP(d.amount) || 0);
+    return { id: uid(), name: String(d.name), balance: b, startBalance: b, apr: 0, updated: t, updatedTs: now };
+  });
+  for (const e of entries) {
+    if (!e || !e.name) continue;
+    const day = Math.min(31, Math.max(1, parseInt(e.day, 10) || 1));
+    const base = { id: uid(), name: String(e.name), amount: Math.max(0, toP(e.amount) || 0), active: true, kind: 'bill', day };
+    if (e.account === 'halifax') s.items.push({ ...base, from: 'halifax' });
+    else if (e.account === 'monzo') s.items.push({ ...base, from: 'monzo' });
+    else s.items.push({ ...base, from: 'transfer', kind: 'daughter' });
+  }
+  for (const it of s.items) {
+    const d = s.debts.find(x => x.name.trim().toLowerCase() === it.name.trim().toLowerCase());
+    if (d && it.kind === 'bill') { it.kind = 'debt'; it.debtId = d.id; }
+  }
+  const reimb = toP(readStore('reimbursements'));
+  if (reimb > 0) s.settings.extrasDefault = reimb;
+  const sav = toP(readStore('currentSavings'));
+  if (sav > 0) s.savings = { balance: sav, updated: t };
+  const pay = toP(readStore('balance'));
+  const pd = readStore('payday');
+  if (pay > 0 && /^\d{4}-\d{2}-\d{2}$/.test(pd || '')) {
+    s.cycles[Engine.cycleIdFor(pd, s)] = { pay, oneOffs: [], ticks: {} };
+  }
+  s.meta.migrated = { at: t, items: s.items.length, debts: s.debts.length };
+  s.meta.reviewMonzo = s.items.some(i => i.from === 'monzo');
+  seedPots(s);
+  return s;
+}
+
+function load() {
+  const raw = readStore(KEY);
+  if (raw) {
+    try { return normalise(JSON.parse(raw)); }
+    catch (e) { try { localStorage.setItem(KEY + '.unreadable', raw); } catch (e2) { /* ignore */ } }
+  }
+  const migrated = migrateOld();
+  if (migrated) return migrated;
+  const s = defaults();
+  seedPots(s);
+  return s;
+}
+
+let saveWarned = false;
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); }
+  catch (e) { if (!saveWarned) { saveWarned = true; toast('This browser would not save. Download a backup from Settings.'); } }
+}
+
+let state = load();
+const view = { tab: 'payday', cycleId: Engine.cycleIdFor(today(), state), open: {} };
+
+function cyc(id = view.cycleId) {
+  if (!state.cycles[id]) state.cycles[id] = { oneOffs: [], ticks: {} };
+  const c = state.cycles[id];
+  if (!c.oneOffs) c.oneOffs = [];
+  if (!c.ticks) c.ticks = {};
+  return c;
+}
+const debtName = id => (state.debts.find(d => d.id === id) || {}).name || 'debt';
+
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// ---------- Header and tabs ----------
+function renderHeader() {
+  const t = today();
+  const cur = Engine.cycleIdFor(t, state);
+  const cy = Engine.getCycle(view.cycleId, state);
+  let tag = 'This pay period';
+  if (view.cycleId === Engine.shiftMonth(cur, 1)) tag = 'Next pay period';
+  else if (view.cycleId < cur) tag = 'Past pay period';
+  else if (view.cycleId > cur) tag = 'Future pay period';
+  $('#periodLabel').innerHTML = `${fmtShort(cy.start)} to ${fmtShort(cy.end)}<small>${tag}</small>`;
+  $('#periodNav').hidden = view.tab !== 'payday';
+  document.querySelectorAll('[role=tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === view.tab)));
+}
+
+function setTab(tab) {
+  view.tab = tab;
+  for (const name of ['payday', 'out', 'debts', 'settings']) $('#tab-' + name).hidden = name !== tab;
+  renderHeader();
+  renderTab();
+  window.scrollTo(0, 0);
+}
+
+function renderTab() {
+  ({ payday: renderPayday, out: renderOut, debts: renderDebts, settings: renderSettings })[view.tab]();
+}
+
+function renderAll() { renderHeader(); renderTab(); }
+
+// ---------- Payday tab ----------
+function noticesHtml(p) {
+  const out = [];
+  const m = state.meta;
+  const t = today();
+  if (m.migrated && !m.migratedAck) {
+    out.push(`<div class="notice info"><strong>Your data from the old planner is here.</strong> ${plural(m.migrated.items, 'payment')} and ${plural(m.migrated.debts, 'debt')} came across. The old version's data is untouched.
+      ${m.reviewMonzo ? ' Have a quick look at your Monzo items in Money out: anything that is a budget (food shop, petrol, spending) rather than a direct debit should move to the Shopping or Spend pot. Add your debt repayments and interest rates in Debts &amp; savings too.' : ''}
+      <div class="actions"><button class="btn btn-sm" data-action="goto" data-tab="out">Review Money out</button><button class="link" data-action="ack-migration">Got it, hide this</button></div></div>`);
+  }
+  if (!state.items.some(i => i.amount > 0)) {
+    out.push(`<div class="notice info"><strong>Start here.</strong> Add your bills and pot budgets in Money out, and any debts in Debts &amp; savings. Then come back on payday and enter what you were paid.
+      <div class="actions"><button class="btn btn-sm" data-action="goto" data-tab="out">Add money out</button></div></div>`);
+  }
+  const cur = Engine.cycleIdFor(t, state);
+  if (p.cycle.id === cur) {
+    const days = Engine.diffDays(t, p.cycle.nextPayday);
+    if (days <= 5) {
+      out.push(`<div class="notice"><strong>Payday is ${days === 1 ? 'tomorrow' : 'in ' + days + ' days'}</strong> (${fmtDate(p.cycle.nextPayday)}).
+        <div class="actions"><button class="btn btn-sm" data-action="next-cycle">Plan it now</button></div></div>`);
+    }
+  }
+  if (p.isPast) {
+    out.push(`<div class="notice">This pay period has finished. The figures use your current Money out list, so they may differ from what you planned at the time. Settings has a history of past plans. <button class="link" data-action="this-cycle">Back to this period</button></div>`);
+  }
+  const hasData = state.items.some(i => i.amount > 0) || state.debts.length;
+  const since = m.lastBackup ? Engine.diffDays(m.lastBackup, t) : null;
+  if (hasData && (since == null || since > 30)) {
+    out.push(`<div class="notice">${since == null ? 'No backup yet.' : `Last backup was ${since} days ago.`} Your figures only live in this browser, so keep a copy somewhere safe.
+      <div class="actions"><button class="btn btn-sm" data-action="export">Download backup</button></div></div>`);
+  }
+  return out.join('');
+}
+
+function renderPayday() {
+  const el = $('#tab-payday');
+  const id = view.cycleId;
+  const p = Engine.buildPlan(state, id, today());
+  const c = state.cycles[id] || {};
+  const s = state.settings;
+  const prev = state.cycles[Engine.shiftMonth(id, -1)];
+  const extrasVal = c.extras == null ? s.extrasDefault : c.extras;
+  el.innerHTML = `
+    ${noticesHtml(p)}
+    <div class="card">
+      <h2>What came in</h2>
+      <div class="field">
+        <label for="inPay">Pay received into Halifax</label>
+        <div class="money-input big"><span>&pound;</span><input id="inPay" inputmode="decimal" autocomplete="off" enterkeyhint="done" data-cycle-field="pay" value="${toPounds(c.pay)}" placeholder="0.00"></div>
+        ${!c.pay && prev && prev.pay ? `<button class="link" id="samePay" data-action="same-pay">Use last month's ${money(prev.pay)}</button>` : ''}
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="inExtras">${esc(s.extrasLabel || 'Extras')}</label>
+          <div class="money-input"><span>&pound;</span><input id="inExtras" inputmode="decimal" autocomplete="off" enterkeyhint="done" data-cycle-field="extras" value="${toPounds(extrasVal)}" placeholder="0.00"></div>
+        </div>
+        <div class="field">
+          <label for="inCarried">Already in Halifax</label>
+          <div class="money-input"><span>&pound;</span><input id="inCarried" inputmode="decimal" autocomplete="off" enterkeyhint="done" data-cycle-field="carried" value="${toPounds(c.carried)}" placeholder="${s.buffer ? toPounds(s.buffer) : '0.00'}"></div>
+        </div>
+      </div>
+      <p class="hint">"Already in Halifax" is optional: whatever was sitting in Halifax just before your pay landed, usually last month's buffer.</p>
+      <div class="payday-row">
+        <span>Payday: <strong>${fmtDate(p.cycle.start, true)}</strong>${c.paydayOverride ? ' <span class="tag">changed</span>' : ''}</span>
+        <button class="link" data-action="edit-payday">Change date</button>
+      </div>
+      <div id="paydayEdit" class="payday-edit" hidden>
+        <input type="date" id="paydayOverride" value="${p.cycle.start}" aria-label="Payday date">
+        ${c.paydayOverride ? '<button class="btn btn-ghost btn-sm" data-action="reset-payday">Back to the usual date</button>' : ''}
+        <p class="hint">Use this if you're paid on a different day, for example before a bank holiday.</p>
+      </div>
+      <div class="total-line"><span>Money to plan with</span><strong id="totalIn" class="num"></strong></div>
+    </div>
+    <div id="planOut"></div>`;
+  renderPlan();
+}
+
+function renderPlan() {
+  const p = Engine.buildPlan(state, view.cycleId, today());
+  const hasPay = p.income.pay > 0;
+  $('#totalIn').textContent = money(p.income.total);
+  $('#planOut').innerHTML = [
+    tilesHtml(p, hasPay),
+    hasPay ? leftoverHtml(p) : '',
+    hasPay ? checklistHtml(p) : '',
+    debtMonthHtml(p),
+    halifaxCheckHtml(p),
+    timelineHtml(p),
+    oneOffsHtml(p),
+    workingHtml(p, hasPay)
+  ].join('');
+  if (hasPay && !p.isPast) snapshot(p);
+}
+
+const lineHtml = (name, amount, sub) =>
+  `<div class="line"><span>${esc(name)}${sub ? `<small>${esc(sub)}</small>` : ''}</span><strong>${money(amount)}</strong></div>`;
+
+function kindNote(l) {
+  if (l.kind === 'debt') return l.debtId ? `Pays off ${debtName(l.debtId)}` : 'Debt repayment';
+  if (l.kind === 'daughter') return "Daughter's savings";
+  if (l.kind === 'saving') return 'Saving';
+  return l.oneOff ? 'One-off' : '';
+}
+
+function tilesHtml(p, hasPay) {
+  const s = state.settings;
+  const nH = p.groups.halifax.length;
+  const perWeek = p.totals.spend > 0 ? Math.floor(p.totals.spend * 7 / p.cycle.days / 100) * 100 : 0;
+  const monzoLines = [
+    lineHtml('Shopping pot', p.totals.shopping),
+    lineHtml('Spend pot', p.totals.spend, perWeek ? `About ${money0(perWeek)} a week` : ''),
+    p.totals.monzo ? lineHtml('Bills pot', p.totals.monzo, plural(p.groups.monzo.length, 'direct debit')) : ''
+  ].join('');
+  let leftNote;
+  if (!hasPay) leftNote = `This period needs ${money(p.allocated)} before anything is left over.`;
+  else if (p.leftover < 0) leftNote = `Your plan needs ${money(-p.leftover)} more than came in. Options below.`;
+  else if (p.leftover === 0) leftNote = 'Every pound is allocated.';
+  else {
+    const bits = [];
+    if (p.split.toSavings) bits.push(`${money(p.split.toSavings)} to ${esc(s.savingsLabel)}`);
+    if (p.split.toDebt) bits.push(`${money(p.split.toDebt)} extra to ${esc(debtName(p.split.debtId))}`);
+    leftNote = `Suggested: ${bits.join(' and ')}.`;
+  }
+  const leftClass = !hasPay ? 'waiting' : p.leftover < 0 ? 'neg' : '';
+  return `<div class="card">
+    <div class="card-head"><h2>Your plan</h2>${hasPay ? (p.balanced
+      ? '<button class="badge" data-action="open-working">&#10003; Every pound accounted for</button>'
+      : '<button class="badge" style="background:var(--bad-soft);color:var(--bad)" data-action="open-working">Check the working</button>') : ''}</div>
+    <div class="tile tile-halifax">
+      <div class="tile-label">Keep in Halifax</div>
+      <div class="tile-amount">${money(p.keep)}</div>
+      <div class="tile-note">Covers ${plural(nH, 'payment')} from ${fmtShort(p.cycle.start)} to ${fmtShort(p.cycle.end)}${p.buffer ? `, plus your ${money(p.buffer)} buffer` : ''}.</div>
+      <button class="link" data-action="open-timeline">See them by date</button>
+    </div>
+    <div class="tile tile-monzo">
+      <div class="tile-label">Monzo pots</div>
+      <div class="tile-amount">${money(p.monzoPots)}</div>
+      <div class="lines">${monzoLines}</div>
+    </div>
+    ${p.groups.transfer.length ? `<div class="tile tile-transfer">
+      <div class="tile-label">Payday transfers</div>
+      <div class="tile-amount">${money(p.totals.transfer)}</div>
+      <div class="lines">${p.groups.transfer.map(l => lineHtml(l.name, l.amount, kindNote(l))).join('')}</div>
+    </div>` : ''}
+    <div class="tile tile-left ${leftClass}">
+      <div class="tile-label">${hasPay && p.leftover < 0 ? 'Short this period' : 'Left over'}</div>
+      <div class="tile-amount">${hasPay ? money(Math.abs(p.leftover)) : 'Enter your pay above'}</div>
+      <div class="tile-note">${leftNote}</div>
+    </div>
+  </div>`;
+}
+
+function leftoverHtml(p) {
+  const s = state.settings;
+  if (p.leftover < 0) {
+    const short = -p.leftover;
+    const tips = [];
+    if (p.totals.spend >= short) tips.push(`Cut the Spend pot to ${money(p.totals.spend - short)} this time (from ${money(p.totals.spend)}).`);
+    else if (p.totals.spend > 0) tips.push(`Even with the Spend pot at nothing you'd still be ${money(short - p.totals.spend)} short.`);
+    if (p.groups.transfer.length) tips.push('Pause or reduce a payday transfer for this month.');
+    if ((cyc(p.cycle.id).oneOffs || []).length) tips.push('Move a one-off to next month.');
+    if (p.buffer) tips.push(`Run with a smaller Halifax buffer than ${money(p.buffer)} this month.`);
+    tips.push('Nothing should go to savings until this is covered.');
+    return `<div class="card"><h2>You're ${money(short)} short</h2><ul class="notes" style="color:var(--ink)">${tips.map(t => `<li>${t}</li>`).join('')}</ul></div>`;
+  }
+  if (p.leftover === 0) return `<div class="card"><h2>Nothing left over</h2><p class="hint">Every pound has a job this period, so there's nothing for savings.</p></div>`;
+
+  const sp = p.split;
+  const savings = state.savings.balance || 0;
+  const target = p.debts.find(d => d.id === (sp.debtId || sp.targetId));
+  let why = '';
+  const gapText = sp.gap > 0 && sp.reason !== 'safety-net' ? `The first ${money(sp.gap)} tops up your ${money(s.safetyNet)} safety net. ` : '';
+  switch (sp.reason) {
+    case 'safety-net': why = `Your savings (${money(savings)}) are below your ${money(s.safetyNet)} safety net, so the suggestion is to save all of it.`; break;
+    case 'highest-rate': why = `${gapText}${esc(target.name)} charges ${target.apr}% a year, the highest of your debts, so extra payments there save you the most.`; break;
+    case 'smallest': why = `${gapText}${esc(target.name)} is your smallest debt. Clearing it ${target.monthly ? `frees up ${money(target.monthly)} a month` : 'takes it off your list'}.`; break;
+    case 'no-debt': why = 'Nothing left to pay off, so it all goes to savings.'; break;
+    case 'savings-only': why = 'Your leftover rule sends nothing to debt. You can change that in Settings.'; break;
+    case 'too-small': why = `${gapText}What's left after that is too small to split.`; break;
+    default: why = '';
+  }
+  const open = p.debts.filter(d => d.room > 0);
+  let controls = '';
+  if (open.length) {
+    const sel = sp.debtId || sp.targetId || open[0].id;
+    controls = `<div class="grid2" style="margin-top:12px">
+      <div class="field"><label for="splitDebt">Extra payment to</label>
+        <select id="splitDebt" data-split="debtId">${open.map(d => `<option value="${esc(d.id)}" ${d.id === sel ? 'selected' : ''}>${esc(d.name)} (${money(d.room)} left)</option>`).join('')}</select></div>
+      <div class="field"><label for="splitAmt">Extra payment</label>
+        <div class="money-input"><span>&pound;</span><input id="splitAmt" inputmode="decimal" autocomplete="off" enterkeyhint="done" data-split="toDebt" value="${toPounds(sp.toDebt)}"></div></div>
+    </div>`;
+  }
+  let impact = '';
+  const chosen = p.debts.find(d => d.id === sp.debtId);
+  if (chosen && sp.toDebt > 0) {
+    const after = chosen.room - sp.toDebt;
+    const before = Engine.projectDebt(chosen.room, chosen.apr, chosen.monthly);
+    const later = Engine.projectDebt(after, chosen.apr, chosen.monthly);
+    if (after <= 0) impact = `That clears ${esc(chosen.name)} completely.`;
+    else if (before.months && later.months && later.months < before.months) {
+      const saved = before.interest - later.interest;
+      impact = `${esc(chosen.name)} would be cleared ${plural(before.months - later.months, 'month')} sooner${saved >= 100 ? `, saving about ${money(saved)} in interest` : ''}.`;
+    } else impact = `${esc(chosen.name)} drops to ${money(after)} once this period's payments are made.`;
+  }
+  return `<div class="card">
+    <h2>What to do with the ${money(p.leftover)}</h2>
+    <p>${why}</p>
+    ${controls}
+    ${lineHtml('To ' + s.savingsLabel, sp.toSavings)}
+    ${sp.toDebt ? lineHtml('Extra to ' + debtName(sp.debtId), sp.toDebt) : ''}
+    ${impact ? `<p class="hint">${impact}</p>` : ''}
+    ${sp.custom ? '<button class="link" data-action="reset-split">Go back to the suggestion</button>' : ''}
+  </div>`;
+}
+
+function checklistHtml(p) {
+  const s = state.settings;
+  const ticks = (state.cycles[p.cycle.id] || {}).ticks || {};
+  const steps = [];
+  const sav = p.split.toSavings;
+  const monzoSav = s.savingsInMonzo ? sav : 0;
+  const send = p.monzoPots + monzoSav;
+  if (send > 0) {
+    steps.push({ key: 'm:send', title: `Send ${money(send)} from Halifax to Monzo`, sub: monzoSav ? `${money(p.monzoPots)} for your pots and ${money(monzoSav)} for ${s.savingsLabel}` : 'For your pots', amount: send });
+    steps.push({ head: 'Then in Monzo, split it into:' });
+    if (p.totals.shopping > 0) steps.push({ key: 'p:shopping', title: 'Shopping pot', amount: p.totals.shopping, indent: true });
+    if (p.totals.spend > 0) steps.push({ key: 'p:spend', title: 'Spend pot', amount: p.totals.spend, indent: true });
+    if (p.totals.monzo > 0) steps.push({ key: 'p:bills', title: 'Bills pot', amount: p.totals.monzo, indent: true });
+    if (monzoSav > 0) steps.push({ key: 'x:savings', title: s.savingsLabel, amount: monzoSav, indent: true });
+  }
+  for (const l of p.groups.transfer) {
+    steps.push({ key: l.key, title: `Transfer to ${l.name}`, sub: kindNote(l), amount: l.amount, debtId: l.debtId });
+  }
+  if (!s.savingsInMonzo && sav > 0) steps.push({ key: 'x:savings', title: `Move to ${s.savingsLabel}`, amount: sav });
+  if (p.split.toDebt > 0) steps.push({ key: 'x:debt', title: `Extra payment to ${debtName(p.split.debtId)}`, sub: 'From your leftover', amount: p.split.toDebt, debtId: p.split.debtId });
+  steps.push({ key: 'h:check', title: `Check Halifax now shows ${money(p.keep)}`, sub: `That covers every Halifax payment until ${fmtDate(p.cycle.nextPayday)}${p.buffer ? ', with your buffer left at the end' : ''}.` });
+
+  const real = steps.filter(x => x.key);
+  const done = real.filter(x => ticks[x.key]).length;
+  const html = steps.map(x => {
+    if (x.head) return `<div class="sub-head">${esc(x.head)}</div>`;
+    const on = !!ticks[x.key];
+    return `<label class="check-item ${on ? 'done' : ''} ${x.indent ? 'indent' : ''}">
+      <input type="checkbox" data-tick="${esc(x.key)}" data-amount="${x.amount || 0}" data-debt="${esc(x.debtId || '')}" ${on ? 'checked' : ''}>
+      <span class="check-text"><strong>${esc(x.title)}</strong>${x.sub ? `<small>${esc(x.sub)}</small>` : ''}</span>
+      ${x.amount ? `<span class="check-amt">${money(x.amount)}</span>` : ''}
+    </label>`;
+  }).join('');
+  return `<div class="card">
+    <div class="card-head"><h2>Payday checklist</h2><span class="progress-text">${done} of ${real.length} done</span></div>
+    ${html}
+  </div>`;
+}
+
+// True if a regular payment to this debt is still to go out in the current pay period.
+function paymentPending(debtId) {
+  const t = today();
+  const id = Engine.cycleIdFor(t, state);
+  const end = Engine.getCycle(id, state).end;
+  const ticks = (state.cycles[id] || {}).ticks || {};
+  return state.items.some(i => i.active !== false && i.kind === 'debt' && i.debtId === debtId && i.amount > 0 &&
+    ((i.from === 'halifax' || i.from === 'monzo') ? Engine.datesInRange(i.day, t, end).length > 0 : !ticks['i:' + i.id]));
+}
+
+function projText(proj, monthly, debtId) {
+  if (proj.months === 0) return 'Cleared';
+  if (proj.never) return monthly ? "Payment doesn't cover the interest" : 'No regular payment set up';
+  const first = Engine.cycleIdFor(today(), state);
+  const last = Engine.shiftMonth(first, proj.months - (paymentPending(debtId) ? 1 : 0));
+  return `Cleared around ${monthLabel(last)}, ${plural(proj.months, 'more payment')}`;
+}
+
+function debtMonthHtml(p) {
+  const list = p.debts.filter(d => d.base > 0 || p.covered[d.id]);
+  if (!list.length) return '';
+  const ticks = (state.cycles[p.cycle.id] || {}).ticks || {};
+  const rows = list.map(d => {
+    const cov = p.covered[d.id] || 0;
+    const extraToCome = p.split.debtId === d.id && !ticks['x:debt'] ? p.split.toDebt : 0;
+    const proj = Engine.projectDebt(Math.max(0, d.now - extraToCome), d.apr, d.monthly);
+    return `<div class="row"><div class="row-main"><div class="row-name">${esc(d.name)}</div>
+      <div class="row-meta">${cov ? `Paying ${money(cov)} this period` : 'Nothing planned this period'} &middot; ${projText(proj, d.monthly, d.id)}</div></div>
+      <div class="row-amt">${money(d.now)}<small>owed now</small></div></div>`;
+  }).join('');
+  return `<div class="card">
+    <div class="card-head"><h2>Debt this period</h2><strong class="num">${money(p.coveredTotal)}</strong></div>
+    <p class="hint">Paid off between ${fmtShort(p.cycle.start)} and ${fmtShort(p.cycle.end)}, including any extra from your leftover.</p>
+    ${rows}
+  </div>`;
+}
+
+function hcResultHtml(tc, actual) {
+  if (actual == null) return '';
+  const diff = actual - tc.required;
+  if (diff > 0) return `<div class="result good"><strong>${money(diff)} more than you need.</strong> <span>If you've already moved your leftover, that's spare and can go to savings.</span></div>`;
+  if (diff === 0) return '<div class="result good"><strong>Spot on.</strong> <span>Exactly what the rest of this period needs.</span></div>';
+  if (tc.dueToday && -diff <= tc.dueToday) return `<div class="result warn"><strong>${money(-diff)} under.</strong> <span>That's fine if today's ${money(tc.dueToday)} has already gone out.</span></div>`;
+  return `<div class="result bad"><strong>${money(-diff)} short.</strong> <span>Top up Halifax before the next payment goes out.</span></div>`;
+}
+
+function halifaxCheckHtml(p) {
+  const tc = p.todayCheck;
+  if (!tc) return '';
+  const t = today();
+  const c = state.cycles[p.cycle.id] || {};
+  const fresh = c.halifaxActualAt === t && c.halifaxActual != null;
+  const soon = [...p.groups.halifax, ...p.groups.monzo]
+    .filter(l => l.date >= t && l.date <= Engine.addDays(t, 7))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  return `<div class="card">
+    <h2>Halifax check for today</h2>
+    <p>Halifax should have at least <strong>${money(tc.required)}</strong> in it today.</p>
+    <p class="hint">${plural(tc.count, 'payment')} still to come before payday on ${fmtDate(p.cycle.nextPayday)}${p.buffer ? ', plus your buffer' : ''}${tc.dueToday ? `. Includes ${money(tc.dueToday)} due today` : ''}.</p>
+    <div class="field" style="margin-top:12px">
+      <label for="hcActual">What does your Halifax app show?</label>
+      <div class="money-input"><span>&pound;</span><input id="hcActual" inputmode="decimal" autocomplete="off" enterkeyhint="done" data-hc value="${fresh ? toPounds(c.halifaxActual) : ''}" placeholder="0.00"></div>
+    </div>
+    <div id="hcResult">${hcResultHtml(tc, fresh ? c.halifaxActual : null)}</div>
+    <div style="margin-top:14px">
+      <div class="lbl">Coming out in the next 7 days</div>
+      ${soon.length ? soon.map(l => lineHtml(l.name, l.amount, `${fmtDate(l.date)} from ${l.from === 'halifax' ? 'Halifax' : 'Monzo Bills pot'}`)).join('') : '<p class="empty">Nothing due.</p>'}
+    </div>
+  </div>`;
+}
+
+function timelineHtml(p) {
+  const t = today();
+  const rows = p.timeline.map(l => `<tr class="${l.date < t ? 'past' : ''}">
+      <td class="nowrap">${fmtDate(l.date)}</td>
+      <td>${esc(l.name)}${l.oneOff ? ' <span class="tag">One-off</span>' : ''}</td>
+      <td class="amt">${money(l.amount)}</td>
+      <td class="amt">${money(l.after)}</td></tr>`).join('');
+  const monzo = p.groups.monzo.length ? `<h3 style="font-size:15px;margin:18px 0 6px">Monzo direct debits (from your Bills pot)</h3>
+    <div class="table-wrap"><table><tbody>${p.groups.monzo.map(l => `<tr class="${l.date < t ? 'past' : ''}"><td class="nowrap">${fmtDate(l.date)}</td><td>${esc(l.name)}</td><td class="amt">${money(l.amount)}</td></tr>`).join('')}</tbody></table></div>` : '';
+  return `<details class="card" id="timeline" ${view.open.timeline ? 'open' : ''}>
+    <summary>Halifax payments by date <span class="muted">${plural(p.groups.halifax.length, 'payment')}</span></summary>
+    <p class="hint" style="margin-top:0">What leaves Halifax this period, and what should be left after each one. Greyed rows have already gone.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Date</th><th>Payment</th><th class="amt">Amount</th><th class="amt">After</th></tr></thead>
+      <tbody>
+        <tr class="minor"><td class="nowrap">${fmtDate(p.cycle.start)}</td><td>After your payday moves</td><td class="amt"></td><td class="amt">${money(p.keep)}</td></tr>
+        ${rows || '<tr><td colspan="4" class="muted">No Halifax payments this period.</td></tr>'}
+        <tr class="total"><td colspan="3">Left in Halifax before next payday</td><td class="amt">${money(p.buffer)}</td></tr>
+      </tbody>
+    </table></div>
+    ${monzo}
+  </details>`;
+}
+
+function oneOffsHtml(p) {
+  const list = (state.cycles[p.cycle.id] || {}).oneOffs || [];
+  const total = list.reduce((t, o) => t + (o.amount || 0), 0);
+  const open = view.open.oneoffs != null ? view.open.oneoffs : list.length > 0;
+  const rows = list.map(o => `<div class="row"><div class="row-main"><div class="row-name">${esc(o.name)}</div>
+      <div class="row-meta">${esc(FROM[o.from] ? FROM[o.from].short : '')}${o.date && (o.from === 'halifax' || o.from === 'monzo') ? ' &middot; ' + fmtDate(o.date) : ''}${o.kind && o.kind !== 'bill' ? ' &middot; ' + esc(KIND[o.kind] || '') : ''}</div></div>
+      <div class="row-amt">${money(o.amount)}</div>
+      <button class="btn btn-ghost btn-sm" data-action="edit-oneoff" data-id="${esc(o.id)}">Edit</button></div>`).join('');
+  return `<details class="card" id="oneoffs" ${open ? 'open' : ''}>
+    <summary>One-offs this period <span class="muted">${list.length ? money(total) : 'None'}</span></summary>
+    <p class="hint" style="margin-top:0">Anything just for this period: a birthday, an MOT, an annual bill, a bigger food shop.</p>
+    ${rows}
+    <div class="actions"><button class="btn btn-ghost btn-sm" data-action="add-oneoff">Add a one-off</button></div>
+  </details>`;
+}
+
+function workingHtml(p, hasPay) {
+  const s = state.settings;
+  const row = (label, amount, sign, cls, sub) => `<tr class="${cls || ''}"><td>${label}${sub ? `<div class="muted" style="font-size:12.5px">${sub}</div>` : ''}</td><td class="amt">${sign || ''}${money(amount)}</td></tr>`;
+  const group = (key, label) => {
+    const ls = p.groups[key];
+    if (!ls.length) return '';
+    const items = ls.map(l => `${esc(l.name)}${l.date ? ' (' + fmtShort(l.date) + ')' : ''} ${money(l.amount)}`).join(', ');
+    return row(`${label} <span class="muted">(${ls.length})</span>`, p.totals[key], '&minus; ', '', items);
+  };
+  const rawPay = Engine.clampDay(p.cycle.id, s.payDay);
+  const nextRaw = Engine.clampDay(Engine.shiftMonth(p.cycle.id, 1), s.payDay);
+  const notes = [];
+  notes.push(`This pay period runs from ${fmtDate(p.cycle.start, true)} to ${fmtDate(p.cycle.end, true)} (${p.cycle.days} days). Every monthly payment dated in that window is counted once.`);
+  if (p.cycle.start !== rawPay) notes.push(`Payday is ${fmtDate(p.cycle.start)} rather than the ${ordinal(Engine.toDate(rawPay).getDate())} because ${(state.cycles[p.cycle.id] || {}).paydayOverride ? 'you changed it' : `the ${ordinal(Engine.toDate(rawPay).getDate())} is a ${DOW_LONG[Engine.toDate(rawPay).getDay()]}`}.`);
+  if (p.cycle.nextPayday !== nextRaw) notes.push(`Your next payday is ${fmtDate(p.cycle.nextPayday)}, so payments dated from then onwards come out of next month's pay instead.`);
+  for (const x of p.twiceInCycle) notes.push(`${esc(x.name)} comes out twice in this period (${x.dates.map(fmtShort).join(' and ')}) because it runs longer than a month.`);
+  for (const it of p.notInCycle) notes.push(`${esc(it.name)} (the ${ordinal(it.day)}) doesn't fall in this period, so it isn't counted here. The next pay covers it.`);
+  if (p.paused.length) notes.push(`Paused, so not counted: ${p.paused.map(i => esc(i.name)).join(', ')}.`);
+  notes.push('Every sum is worked out in whole pence, so there are no rounding errors.');
+  const check = hasPay
+    ? (p.balanced
+      ? `<div class="ok-line">&#10003; ${money(p.income.total)} in = ${money(p.keep)} Halifax + ${money(p.monzoPots)} Monzo pots + ${money(p.totals.transfer)} transfers ${p.leftover < 0 ? '&minus; ' : '+ '}${money(Math.abs(p.leftover))} ${p.leftover < 0 ? 'short' : 'left over'}</div>`
+      : '<div class="bad-line">These figures do not add up. Download a backup and report it so the cause can be found.</div>')
+    : '';
+  return `<details class="card" id="working" ${view.open.working ? 'open' : ''}>
+    <summary>Show the working</summary>
+    <div class="table-wrap"><table><tbody>
+      ${row('Pay received', p.income.pay)}
+      ${p.income.extras ? row(esc(s.extrasLabel || 'Extras'), p.income.extras, '+ ') : ''}
+      ${p.income.carried ? row('Already in Halifax', p.income.carried, '+ ') : ''}
+      ${row('Money to plan with', p.income.total, '', 'total')}
+      ${group('halifax', 'Halifax payments')}
+      ${p.buffer ? row('Halifax buffer', p.buffer, '&minus; ') : ''}
+      ${group('monzo', 'Monzo Bills pot')}
+      ${group('shopping', 'Monzo Shopping pot')}
+      ${group('spend', 'Monzo Spend pot')}
+      ${group('transfer', 'Payday transfers')}
+      ${row(p.leftover < 0 ? 'Short by' : 'Left over', Math.abs(p.leftover), '', 'total')}
+      ${hasPay && p.leftover > 0 ? row('&nbsp;&nbsp;to ' + esc(s.savingsLabel), p.split.toSavings, '', 'minor') : ''}
+      ${hasPay && p.split.toDebt > 0 ? row('&nbsp;&nbsp;extra to ' + esc(debtName(p.split.debtId)), p.split.toDebt, '', 'minor') : ''}
+    </tbody></table></div>
+    ${check}
+    <ul class="notes">${notes.map(n => `<li>${n}</li>`).join('')}</ul>
+  </details>`;
+}
+
+function snapshot(p) {
+  const c = cyc(p.cycle.id);
+  const snap = {
+    pay: p.income.pay, total: p.income.total, keep: p.keep, monzo: p.monzoPots, transfers: p.totals.transfer,
+    leftover: p.leftover, toSavings: p.split.toSavings, toDebt: p.split.toDebt, debt: p.coveredTotal
+  };
+  if (JSON.stringify(c.snapshot) !== JSON.stringify(snap)) { c.snapshot = snap; save(); }
+}
+
+// ---------- Money out tab ----------
+function renderOut() {
+  const el = $('#tab-out');
+  const active = state.items.filter(i => i.active !== false);
+  const total = active.reduce((t, i) => t + (i.amount || 0), 0);
+  const groupTotal = key => active.filter(i => i.from === key).reduce((t, i) => t + (i.amount || 0), 0);
+  let html = '';
+  if (state.meta.reviewMonzo) {
+    html += `<div class="notice">These Monzo items came from your old planner, which couldn't tell bills from budgets. If any are budgets (food shop, petrol, spending) rather than direct debits, tap Edit and choose the Shopping or Spend pot.
+      <div class="actions"><button class="link" data-action="ack-monzo">Done, hide this</button></div></div>`;
+  }
+  html += `<div class="card">
+    <div class="card-head"><h2>Money out each month</h2><button class="btn btn-sm" data-action="add-item">Add</button></div>
+    <p class="hint" style="margin-top:0">Set this up once and update it when something changes. The Payday screen works out the rest.</p>
+    ${Object.keys(FROM).map(k => lineHtml(FROM[k].label, groupTotal(k))).join('')}
+    <div class="total-line"><span>Total each month</span><strong class="num">${money(total)}</strong></div>
+  </div>`;
+  for (const [key, meta] of Object.entries(FROM)) {
+    const dated = key === 'halifax' || key === 'monzo';
+    const list = state.items.filter(i => i.from === key)
+      .sort((a, b) => (dated ? (a.day || 0) - (b.day || 0) : 0) || a.name.localeCompare(b.name));
+    html += `<div class="card group-${key}">
+      <div class="card-head"><h2>${esc(meta.label)}</h2><strong class="num">${money(groupTotal(key))}</strong></div>
+      <p class="hint" style="margin-top:0">${esc(meta.note)}</p>
+      ${list.map(itemRowHtml).join('') || '<p class="empty">Nothing here yet.</p>'}
+      <button class="link" data-action="add-item" data-from="${key}">+ Add to ${esc(meta.short)}</button>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+function itemRowHtml(i) {
+  const meta = [];
+  if (i.from === 'halifax' || i.from === 'monzo') meta.push(`The ${ordinal(i.day)}`);
+  if (i.kind === 'debt') meta.push(i.debtId ? `Pays off ${esc(debtName(i.debtId))}` : 'Debt repayment');
+  else if (i.kind && i.kind !== 'bill') meta.push(esc(KIND[i.kind] || ''));
+  if (i.active === false) meta.push('Paused');
+  return `<div class="row ${i.active === false ? 'paused' : ''}">
+    <div class="row-main"><div class="row-name">${esc(i.name)}</div>${meta.length ? `<div class="row-meta">${meta.join(' &middot; ')}</div>` : ''}</div>
+    <div class="row-amt">${money(i.amount)}</div>
+    <button class="btn btn-ghost btn-sm" data-action="edit-item" data-id="${esc(i.id)}">Edit</button>
+  </div>`;
+}
+
+// ---------- Debts tab ----------
+function renderDebts() {
+  const el = $('#tab-debts');
+  const t = today();
+  const s = state.settings;
+  const debts = state.debts.map(d => ({ ...d, now: Engine.debtBalance(d, state, t), monthly: Engine.monthlyFor(d.id, state) }));
+  const totalDebt = debts.reduce((x, d) => x + d.now, 0);
+  const sav = state.savings.balance || 0;
+  const net = sav - totalDebt;
+  const pct = s.safetyNet ? Math.min(100, Math.round(sav / s.safetyNet * 100)) : 100;
+  let html = `<div class="card">
+    <h2>Savings</h2>
+    <div class="grid2">
+      <div class="field"><label for="savBal">Savings now</label>
+        <div class="money-input"><span>&pound;</span><input id="savBal" inputmode="decimal" autocomplete="off" enterkeyhint="done" data-savings value="${toPounds(sav)}"></div>
+        <p class="hint">${state.savings.updated ? 'Updated ' + fmtDate(state.savings.updated, true) : 'Not set yet'}</p></div>
+      <div class="field"><label for="savNet">Safety net target</label>
+        <div class="money-input"><span>&pound;</span><input id="savNet" inputmode="decimal" autocomplete="off" enterkeyhint="done" data-setting="safetyNet" data-type="money" value="${toPounds(s.safetyNet)}"></div>
+        <p class="hint">Money kept back for emergencies before extra goes to debt.</p></div>
+    </div>
+    <div class="bar"><span style="width:${pct}%"></span></div>
+    <p class="hint">${sav >= s.safetyNet ? 'Safety net reached.' : `${money(s.safetyNet - sav)} to go until your safety net is in place.`}</p>
+  </div>
+  <div class="card">
+    <h2>Where you stand</h2>
+    ${lineHtml('Savings', sav)}
+    ${lineHtml('Debts (estimated now)', totalDebt)}
+    <div class="total-line"><span>${net >= 0 ? 'Savings ahead of debts by' : 'Debts ahead of savings by'}</span><strong class="num" style="color:var(--${net >= 0 ? 'good' : 'bad'})">${money(Math.abs(net))}</strong></div>
+  </div>`;
+  html += debts.map(debtCardHtml).join('');
+  html += `<div class="card">
+    <h2>Add a debt</h2>
+    <div class="field"><label for="ndName">Name</label><input type="text" id="ndName" maxlength="40" placeholder="e.g. Credit card"></div>
+    <div class="grid2">
+      <div class="field"><label for="ndBal">Balance owed now</label><div class="money-input"><span>&pound;</span><input id="ndBal" inputmode="decimal" autocomplete="off" placeholder="0.00"></div></div>
+      <div class="field"><label for="ndApr">Interest rate (APR %)</label><input type="number" id="ndApr" step="0.1" min="0" inputmode="decimal" placeholder="0 if interest free"></div>
+    </div>
+    <button class="btn" data-action="add-debt">Add debt</button>
+    <p class="hint">Then link the regular payment: in Money out, set "What is it?" to Debt repayment.</p>
+  </div>`;
+  el.innerHTML = html;
+}
+
+function debtCardHtml(d) {
+  const proj = Engine.projectDebt(d.now, d.apr, d.monthly);
+  const start = Math.max(d.startBalance || 0, d.now);
+  const paid = Math.max(0, start - d.now);
+  const pct = start ? Math.min(100, Math.round(paid / start * 100)) : 0;
+  const linked = state.items.filter(i => i.kind === 'debt' && i.debtId === d.id && i.active !== false);
+  const editing = view.editDebt === d.id;
+  return `<div class="card">
+    <div class="card-head"><h2>${esc(d.name)}</h2><span class="tag">${d.apr ? esc(d.apr) + '% APR' : 'Interest free'}</span></div>
+    <div class="big-num">${money(d.now)}</div>
+    <p class="hint" style="margin-top:0">Estimated balance now. From your figure of ${money(d.balance)} on ${fmtDate(d.updated, true)}${d.balance !== d.now ? `, less ${money(d.balance - d.now)} paid since` : ''}.</p>
+    ${start ? `<div class="bar"><span style="width:${pct}%"></span></div><p class="hint" style="margin-top:0">Paid off ${money(paid)} of ${money(start)}.</p>` : ''}
+    ${lineHtml('Regular payment', d.monthly, linked.length ? linked.map(i => `${i.name} (${i.from === 'transfer' ? 'payday transfer' : 'the ' + ordinal(i.day)})`).join(', ') : 'None linked yet. Set one up in Money out.')}
+    <div class="line"><span>When it's cleared</span><strong style="white-space:normal;text-align:right">${projText(proj, d.monthly, d.id)}</strong></div>
+    ${proj.interest > 0 && !proj.never ? `<p class="hint">About ${money(proj.interest)} in interest before then, assuming no new spending on it.</p>` : ''}
+    <div class="actions"><button class="btn btn-ghost btn-sm" data-action="edit-debt" data-id="${esc(d.id)}">${editing ? 'Close' : 'Update balance or edit'}</button></div>
+    ${editing ? `<div class="debt-edit">
+      <div class="field"><label for="edName">Name</label><input type="text" id="edName" maxlength="40" value="${esc(d.name)}"></div>
+      <div class="grid2">
+        <div class="field"><label for="edBal">Balance on your latest statement</label><div class="money-input"><span>&pound;</span><input id="edBal" inputmode="decimal" autocomplete="off" value="${toPounds(d.now)}"></div>
+          <p class="hint">Saving a new figure resets the estimate from today.</p></div>
+        <div class="field"><label for="edApr">Interest rate (APR %)</label><input type="number" id="edApr" step="0.1" min="0" inputmode="decimal" value="${esc(d.apr || 0)}"></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-sm" data-action="save-debt" data-id="${esc(d.id)}">Save</button>
+        <span style="flex:1"></span>
+        <button class="btn btn-danger btn-sm" data-action="delete-debt" data-id="${esc(d.id)}">Delete debt</button>
+      </div>
+    </div>` : ''}
+  </div>`;
+}
+
+// ---------- Settings tab ----------
+function renderSettings() {
+  const el = $('#tab-settings');
+  const s = state.settings;
+  const m = state.meta;
+  const hist = Object.entries(state.cycles)
+    .filter(([, c]) => c.snapshot && c.snapshot.pay)
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .slice(0, 24);
+  el.innerHTML = `
+  <div class="card">
+    <h2>Payday</h2>
+    <div class="grid2">
+      <div class="field"><label for="setPayDay">Day of the month you're paid</label>
+        <input type="number" id="setPayDay" min="1" max="31" inputmode="numeric" data-setting="payDay" data-type="int" value="${esc(s.payDay)}"></div>
+      <div class="field"><label for="setWeekend">If that's a weekend</label>
+        <select id="setWeekend" data-setting="weekendRule">
+          <option value="before" ${s.weekendRule === 'before' ? 'selected' : ''}>Paid the Friday before</option>
+          <option value="after" ${s.weekendRule === 'after' ? 'selected' : ''}>Paid the Monday after</option>
+          <option value="none" ${s.weekendRule === 'none' ? 'selected' : ''}>No change</option>
+        </select></div>
+    </div>
+    <p class="hint" style="margin-top:0">For a bank holiday, change that month's date on the Payday screen.</p>
+  </div>
+  <div class="card">
+    <h2>Halifax buffer</h2>
+    <div class="field"><label for="setBuffer">Cushion to leave in Halifax</label>
+      <div class="money-input"><span>&pound;</span><input id="setBuffer" inputmode="decimal" autocomplete="off" data-setting="buffer" data-type="money" value="${toPounds(s.buffer)}"></div>
+      <p class="hint">Covers a bill coming in higher than expected, such as energy. It stays in Halifax and carries into next month.</p></div>
+  </div>
+  <div class="card">
+    <h2>Regular extras</h2>
+    <div class="grid2">
+      <div class="field"><label for="setExLabel">What they are</label><input type="text" id="setExLabel" maxlength="40" data-setting="extrasLabel" value="${esc(s.extrasLabel)}"></div>
+      <div class="field"><label for="setExAmt">Usual amount</label><div class="money-input"><span>&pound;</span><input id="setExAmt" inputmode="decimal" autocomplete="off" data-setting="extrasDefault" data-type="money" value="${toPounds(s.extrasDefault)}"></div></div>
+    </div>
+    <p class="hint" style="margin-top:0">Filled in for you each payday. You can change it for a single month on the Payday screen.</p>
+  </div>
+  <div class="card">
+    <h2>Leftover</h2>
+    <div class="field"><label for="setSavLabel">Where savings go</label><input type="text" id="setSavLabel" maxlength="40" data-setting="savingsLabel" value="${esc(s.savingsLabel)}"></div>
+    <div class="field"><label class="check"><input type="checkbox" data-setting="savingsInMonzo" data-type="bool" ${s.savingsInMonzo ? 'checked' : ''}> It's a Monzo pot, so send it with the pot money</label></div>
+    <div class="field"><label for="setPct">Share of leftover towards debt, once your safety net is in place</label>
+      <input type="number" id="setPct" min="0" max="100" step="5" inputmode="numeric" data-setting="debtSplitPct" data-type="int" value="${esc(s.debtSplitPct)}">
+      <p class="hint">In %. The suggestion goes to the debt with the highest interest rate, or the smallest one if none charge interest. You can override it each month.</p></div>
+  </div>
+  <div class="card">
+    <h2>Backup</h2>
+    <p>Your figures are stored in this browser only. Nothing is sent anywhere. That also means clearing your browser, or switching phone, loses them, so keep a backup.</p>
+    <p class="hint">Last backup: ${m.lastBackup ? fmtDate(m.lastBackup, true) : 'never'}.</p>
+    <div class="actions">
+      <button class="btn" data-action="export">Download backup</button>
+      <button class="btn btn-ghost" data-action="import">Restore from a backup</button>
+    </div>
+    <p class="hint">On iPhone, the Home Screen icon keeps its own separate copy from Safari. Pick one and stick with it, or use a backup to move between them.</p>
+  </div>
+  <div class="card">
+    <h2>History</h2>
+    ${hist.length ? `<div class="table-wrap"><table>
+      <thead><tr><th>Payday</th><th class="amt">Paid</th><th class="amt">Left over</th><th class="amt">Saved</th><th class="amt">Debt paid</th></tr></thead>
+      <tbody>${hist.map(([id, c]) => `<tr><td class="nowrap">${fmtShort(Engine.paydayOf(id, state))} ${id.slice(0, 4)}</td><td class="amt">${money(c.snapshot.pay)}</td><td class="amt">${money(c.snapshot.leftover)}</td><td class="amt">${money(c.snapshot.toSavings)}</td><td class="amt">${money(c.snapshot.debt)}</td></tr>`).join('')}</tbody>
+    </table></div>` : '<p class="empty">Each payday you plan is recorded here.</p>'}
+  </div>
+  <div class="card">
+    <h2>How the maths works</h2>
+    <ul class="notes" style="color:var(--ink);margin-top:0">
+      <li>A pay period runs from payday to the day before the next payday. Every monthly payment dated inside it is counted once, so nothing is double counted and nothing is missed.</li>
+      <li><strong>Keep in Halifax</strong> is every Halifax direct debit and standing order in the period, plus your buffer.</li>
+      <li><strong>Monzo pots</strong> are your Shopping and Spend budgets, plus any Monzo direct debits for the Bills pot.</li>
+      <li><strong>Left over</strong> is what came in, less all of the above and your payday transfers.</li>
+      <li>Debt balances start from the figure you enter, then drop as direct debits pass their date and as you tick off payday transfers.</li>
+      <li>All sums use whole pence. "Show the working" on the Payday screen lists every line.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h2>Start again</h2>
+    <p class="hint" style="margin-top:0">Deletes everything in this planner on this device. Download a backup first.</p>
+    <div class="actions"><button class="btn btn-danger" data-action="reset-all">Clear all data</button></div>
+  </div>
+  <footer class="foot">Finance Manager ${VERSION}</footer>`;
+}
+
+// ---------- Item dialog ----------
+const dlg = $('#itemDialog');
+const form = $('#itemForm');
+let editing = null;
+
+function openItemDialog(mode, id, preset) {
+  const list = mode === 'item' ? state.items : cyc().oneOffs;
+  const src = id ? list.find(x => x.id === id) : null;
+  editing = { mode, id: src ? src.id : null };
+  const v = src || { name: '', amount: null, from: (preset && preset.from) || (mode === 'oneoff' ? 'halifax' : 'halifax'), day: '', kind: 'bill', debtId: '', active: true, date: '' };
+  const f = form.elements;
+  $('#itemTitle').textContent = `${src ? 'Edit' : 'Add'} ${mode === 'oneoff' ? 'a one-off' : 'money out'}`;
+  f.name.value = v.name || '';
+  f.amount.value = toPounds(v.amount);
+  f.from.value = v.from || 'halifax';
+  f.day.value = v.day || '';
+  const cy = Engine.getCycle(view.cycleId, state);
+  f.date.value = v.date || cy.start;
+  f.date.min = cy.start;
+  f.date.max = cy.end;
+  f.kind.value = v.kind || 'bill';
+  f.debtId.innerHTML = state.debts.length
+    ? state.debts.map(d => `<option value="${esc(d.id)}">${esc(d.name)}</option>`).join('')
+    : '<option value="">No debts yet: add one in Debts &amp; savings</option>';
+  if (v.debtId) f.debtId.value = v.debtId;
+  f.active.checked = v.active !== false;
+  $('#itemDelete').hidden = !src;
+  $('#itemError').textContent = '';
+  syncDialog();
+  dlg.showModal();
+  if (!src) setTimeout(() => f.name.focus(), 50);
+}
+
+function syncDialog() {
+  const f = form.elements;
+  const dated = f.from.value === 'halifax' || f.from.value === 'monzo';
+  form.querySelector('[data-show=day]').hidden = !(dated && editing.mode === 'item');
+  form.querySelector('[data-show=date]').hidden = !(dated && editing.mode === 'oneoff');
+  form.querySelector('[data-show=debt]').hidden = f.kind.value !== 'debt';
+  form.querySelector('[data-show=active]').hidden = editing.mode !== 'item';
+}
+
+form.addEventListener('change', e => { if (e.target.name === 'from' || e.target.name === 'kind') syncDialog(); });
+
+form.addEventListener('submit', e => {
+  e.preventDefault();
+  const f = form.elements;
+  const err = msg => { $('#itemError').textContent = msg; };
+  const name = f.name.value.trim();
+  const amount = toP(f.amount.value);
+  const from = f.from.value;
+  const kind = f.kind.value;
+  const dated = from === 'halifax' || from === 'monzo';
+  if (!name) return err('Give it a name.');
+  if (amount == null || amount < 0) return err('Enter an amount, like 49.99.');
+  const obj = { id: editing.id || uid(), name, amount, from, kind, debtId: null };
+  if (kind === 'debt') {
+    if (!state.debts.length) return err('Add the debt in Debts & savings first, then link it here.');
+    obj.debtId = f.debtId.value;
+  }
+  if (editing.mode === 'item') {
+    if (dated) {
+      const day = parseInt(f.day.value, 10);
+      if (!(day >= 1 && day <= 31)) return err('Enter the day of the month it comes out (1 to 31).');
+      obj.day = day;
+    }
+    obj.active = f.active.checked;
+    const i = state.items.findIndex(x => x.id === obj.id);
+    if (i >= 0) state.items[i] = { ...state.items[i], ...obj }; else state.items.push(obj);
+  } else {
+    const cy = Engine.getCycle(view.cycleId, state);
+    if (dated) {
+      const date = f.date.value;
+      if (!date || date < cy.start || date > cy.end) return err(`Pick a date between ${fmtDate(cy.start)} and ${fmtDate(cy.end)}.`);
+      obj.date = date;
+    }
+    const list = cyc().oneOffs;
+    const i = list.findIndex(x => x.id === obj.id);
+    if (i >= 0) list[i] = obj; else list.push(obj);
+  }
+  save();
+  dlg.close();
+  renderTab();
+  toast('Saved');
+});
+
+dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+
+// ---------- Backup ----------
+function exportBackup() {
+  const data = JSON.stringify({ app: 'finance-manager', version: VERSION, exported: new Date().toISOString(), state }, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `finance-manager-backup-${today()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  state.meta.lastBackup = today();
+  save();
+  renderTab();
+  toast('Backup downloaded');
+}
+
+function importBackup(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let obj;
+    try { obj = JSON.parse(reader.result); } catch (e) { toast("That file isn't a backup from this planner."); return; }
+    const s = obj && obj.state ? obj.state : obj;
+    if (!s || !Array.isArray(s.items) || !s.settings) { toast("That file isn't a backup from this planner."); return; }
+    if (!confirm('Replace everything on this device with the backup?')) return;
+    state = normalise(s);
+    state.meta.migratedAck = true;
+    save();
+    view.cycleId = Engine.cycleIdFor(today(), state);
+    renderAll();
+    toast('Backup restored');
+  };
+  reader.readAsText(file);
+}
+
+// ---------- Events ----------
+const actions = {
+  'prev-cycle': () => { view.cycleId = Engine.shiftMonth(view.cycleId, -1); renderAll(); },
+  'next-cycle': () => { view.cycleId = Engine.shiftMonth(view.cycleId, 1); if (view.tab !== 'payday') setTab('payday'); else renderAll(); window.scrollTo(0, 0); },
+  'this-cycle': () => { view.cycleId = Engine.cycleIdFor(today(), state); renderAll(); },
+  'goto': b => setTab(b.dataset.tab),
+  'same-pay': () => { cyc().pay = state.cycles[Engine.shiftMonth(view.cycleId, -1)].pay; save(); renderPayday(); },
+  'edit-payday': () => { $('#paydayEdit').hidden = !$('#paydayEdit').hidden; },
+  'reset-payday': () => { delete cyc().paydayOverride; save(); renderAll(); },
+  'open-working': () => { view.open.working = true; const d = $('#working'); d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
+  'open-timeline': () => { view.open.timeline = true; const d = $('#timeline'); d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
+  'reset-split': () => { delete cyc().split; untickSplit(); save(); renderPlan(); },
+  'add-item': b => openItemDialog('item', null, { from: b.dataset.from }),
+  'edit-item': b => openItemDialog('item', b.dataset.id),
+  'add-oneoff': () => openItemDialog('oneoff', null),
+  'edit-oneoff': b => openItemDialog('oneoff', b.dataset.id),
+  'close-dialog': () => dlg.close(),
+  'delete-item': () => {
+    if (!editing || !editing.id) return;
+    if (!confirm('Delete this?')) return;
+    if (editing.mode === 'item') state.items = state.items.filter(x => x.id !== editing.id);
+    else cyc().oneOffs = cyc().oneOffs.filter(x => x.id !== editing.id);
+    save(); dlg.close(); renderTab(); toast('Deleted');
+  },
+  'ack-migration': () => { state.meta.migratedAck = true; save(); renderTab(); },
+  'ack-monzo': () => { state.meta.reviewMonzo = false; save(); renderTab(); },
+  'add-debt': () => {
+    const name = $('#ndName').value.trim();
+    const bal = toP($('#ndBal').value);
+    const apr = parseFloat($('#ndApr').value) || 0;
+    if (!name || bal == null || bal < 0) { toast('Enter a name and the balance owed.'); return; }
+    state.debts.push({ id: uid(), name, balance: bal, startBalance: bal, apr: Math.max(0, apr), updated: today(), updatedTs: Date.now() });
+    save(); renderDebts(); toast('Debt added');
+  },
+  'edit-debt': b => { view.editDebt = view.editDebt === b.dataset.id ? null : b.dataset.id; renderDebts(); },
+  'save-debt': b => {
+    const d = state.debts.find(x => x.id === b.dataset.id);
+    if (!d) return;
+    const name = $('#edName').value.trim();
+    const bal = toP($('#edBal').value);
+    const apr = parseFloat($('#edApr').value) || 0;
+    if (!name || bal == null || bal < 0) { toast('Enter a name and a balance.'); return; }
+    d.name = name;
+    d.apr = Math.max(0, apr);
+    const current = Engine.debtBalance(d, state, today());
+    if (bal !== current) {
+      d.balance = bal; d.updated = today(); d.updatedTs = Date.now();
+      if (bal > (d.startBalance || 0)) d.startBalance = bal;
+    }
+    view.editDebt = null;
+    save(); renderDebts(); toast('Saved');
+  },
+  'delete-debt': b => {
+    const d = state.debts.find(x => x.id === b.dataset.id);
+    if (!d || !confirm(`Delete ${d.name}? Payments linked to it stay in Money out as bills.`)) return;
+    state.debts = state.debts.filter(x => x.id !== d.id);
+    for (const i of state.items) if (i.debtId === d.id) { i.debtId = null; i.kind = 'bill'; }
+    view.editDebt = null;
+    save(); renderDebts();
+  },
+  'export': () => exportBackup(),
+  'import': () => $('#importFile').click(),
+  'reset-all': () => {
+    if (!confirm('Delete everything in this planner on this device?')) return;
+    if (!confirm('Last check: this cannot be undone unless you have a backup. Delete?')) return;
+    state = defaults();
+    seedPots(state);
+    state.meta.migratedAck = true;
+    save();
+    view.cycleId = Engine.cycleIdFor(today(), state);
+    setTab('payday');
+    toast('Cleared');
+  }
+};
+
+function untickSplit() {
+  const c = cyc();
+  delete c.ticks['x:debt'];
+  delete c.ticks['x:savings'];
+}
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-action], [role=tab]');
+  if (!b) return;
+  if (b.getAttribute('role') === 'tab') { setTab(b.dataset.tab); return; }
+  const fn = actions[b.dataset.action];
+  if (fn) { e.preventDefault(); fn(b, e); }
+});
+
+document.addEventListener('toggle', e => {
+  if (e.target.matches && e.target.matches('details[id]')) view.open[e.target.id] = e.target.open;
+}, true);
+
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (el.dataset.cycleField) {
+    const v = toP(el.value);
+    const c = cyc();
+    c[el.dataset.cycleField] = el.dataset.cycleField === 'pay' ? (v && v > 0 ? v : null) : (v == null ? 0 : v);
+    if (c.pay && $('#samePay')) $('#samePay').hidden = true;
+    save();
+    renderPlan();
+  } else if (el.hasAttribute('data-hc')) {
+    const c = cyc();
+    c.halifaxActual = toP(el.value);
+    c.halifaxActualAt = today();
+    save();
+    const p = Engine.buildPlan(state, view.cycleId, today());
+    if (p.todayCheck) $('#hcResult').innerHTML = hcResultHtml(p.todayCheck, c.halifaxActual);
+  }
+});
+
+document.addEventListener('change', e => {
+  const el = e.target;
+  if (el.dataset.tick) {
+    const c = cyc();
+    const key = el.dataset.tick;
+    if (el.checked) {
+      if ((key === 'x:debt' || key === 'x:savings') && (!c.split || c.split.toDebt == null)) {
+        const p = Engine.buildPlan(state, view.cycleId, today());
+        c.split = { toDebt: p.split.toDebt, debtId: p.split.debtId };
+      }
+      c.ticks[key] = { ts: Date.now(), at: today(), amount: Number(el.dataset.amount) || 0, debtId: el.dataset.debt || null };
+    } else {
+      delete c.ticks[key];
+    }
+    save();
+    renderPlan();
+  } else if (el.dataset.split) {
+    const c = cyc();
+    const p = Engine.buildPlan(state, view.cycleId, today());
+    const cur = c.split || { toDebt: p.split.toDebt, debtId: p.split.debtId || p.split.targetId };
+    if (el.dataset.split === 'toDebt') cur.toDebt = Math.max(0, toP(el.value) || 0);
+    else cur.debtId = el.value;
+    if (cur.toDebt == null) cur.toDebt = 0;
+    c.split = cur;
+    untickSplit();
+    save();
+    renderPlan();
+  } else if (el.id === 'paydayOverride') {
+    const id = view.cycleId;
+    const v = el.value;
+    const usual = Engine.nominalPayday(id, state.settings);
+    if (!v || Math.abs(Engine.diffDays(Engine.clampDay(id, state.settings.payDay), v)) > 10) {
+      toast('Pick a date within 10 days of your usual payday.');
+      el.value = Engine.getCycle(id, state).start;
+      return;
+    }
+    const c = cyc();
+    if (v === usual) delete c.paydayOverride; else c.paydayOverride = v;
+    save();
+    renderAll();
+  } else if (el.hasAttribute('data-savings')) {
+    const v = toP(el.value);
+    state.savings = { balance: Math.max(0, v || 0), updated: today() };
+    save();
+    renderDebts();
+  } else if (el.dataset.setting) {
+    const k = el.dataset.setting;
+    const type = el.dataset.type;
+    let v;
+    if (type === 'money') v = Math.max(0, toP(el.value) || 0);
+    else if (type === 'int') v = parseInt(el.value, 10);
+    else if (type === 'bool') v = el.checked;
+    else v = el.value.trim();
+    if (k === 'payDay' && !(v >= 1 && v <= 31)) { toast('Enter a day from 1 to 31.'); el.value = state.settings.payDay; return; }
+    if (k === 'debtSplitPct') v = Math.min(100, Math.max(0, v || 0));
+    if ((k === 'savingsLabel' || k === 'extrasLabel') && !v) v = k === 'savingsLabel' ? 'Savings' : 'Extras';
+    state.settings[k] = v;
+    save();
+    if (k === 'payDay' || k === 'weekendRule') view.cycleId = Engine.cycleIdFor(today(), state);
+    renderAll();
+    toast('Saved');
+  } else if (el.id === 'importFile' && el.files && el.files[0]) {
+    importBackup(el.files[0]);
+    el.value = '';
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.matches('.money-input input') && !e.target.closest('form')) e.target.blur();
+});
+
+try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) { /* ignore */ }
+save();
+setTab('payday');
+</script>
+</body>
+</html>
