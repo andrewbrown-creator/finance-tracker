@@ -844,7 +844,11 @@ async function connect(owner, repo, token) {
   if (!res.ok) { const k = kindFor(res.status); sync = {}; throw new SyncError(k, res.status); }
   const remote = await pullRemote();
   if (remote.exists) {
-    if (hasRealData(state) && !confirm('Your private store already has figures in it.\n\nOK: use the saved figures (recommended).\nCancel: replace them with the figures on this device.')) {
+    if (!hasRealData(normalise(remote.data))) {
+      // The store only holds empty starter figures, so this device's figures win without asking
+      sync.sha = remote.sha;
+      sync.dirty = true;
+    } else if (hasRealData(state) && !confirm('Your private store already has figures in it.\n\nOK: use the saved figures (recommended).\nCancel: replace them with the figures on this device.')) {
       sync.sha = remote.sha;
       sync.dirty = true;
     } else {
