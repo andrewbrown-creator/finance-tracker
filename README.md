@@ -10,7 +10,14 @@ A personal payday planner that keeps you a month ahead. Enter what you were paid
 6. **Left over:** into the savings pot, or some towards a debt.
 7. **Where you stand:** savings against everything owed. In the black or in the red.
 
-Then a tick list for payday, a Halifax check for any day of the month, and the full working.
+## On payday (about 5 minutes)
+
+1. Pay fills in from last month. Type your **Halifax balance**.
+2. **Your payday moves** shows exactly what to do, grouped by app. Tap an amount to copy it into the banking app, and tick each move off.
+3. **How it adds up** shows every line. Tap a line to change or skip something for that month only, or add a one-off (a bill, extra for a pot, a payment to someone).
+4. Short month? One tap to top up from savings or trim the Spend pot.
+
+Also: **Can I afford it?** for any amount, quick *I paid / I owe more* buttons for debts, *Put in / Took out* for savings, a Halifax check for any day of the month, and a payday reminder for your calendar.
 
 ## How the maths works
 
@@ -18,7 +25,7 @@ Then a tick list for payday, a Halifax check for any day of the month, and the f
 * Leave in Halifax = rest of this month + all of next month (+ an optional cushion).
 * Free to share out = Halifax balance minus that. With no balance entered, it assumes last month kept back exactly enough.
 * Bills on the 29th to 31st fall on the last day of shorter months. Weekend paydays move to the Friday before.
-* All sums are done in whole pence. "Show the working" confirms every pound is accounted for.
+* All sums are done in whole pence. "How it adds up" on the Payday screen confirms every pound is accounted for.
 
 ## Your figures and privacy
 
@@ -30,7 +37,7 @@ Then a tick list for payday, a Halifax check for any day of the month, and the f
 
 ## Checking the maths
 
-`tests/engine.test.js` runs 26 checks against the calculation code taken straight from `finance-manager.html`, including a two-year simulation proving Halifax never runs short and arrives at each payday holding exactly the rest of that month.
+`tests/engine.test.js` runs 31 checks against the calculation code taken straight from `finance-manager.html`, including a two-year simulation proving Halifax never runs short and arrives at each payday holding exactly the rest of that month.
 
 ```
 node tests/engine.test.js

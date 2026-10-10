@@ -250,6 +250,46 @@
     opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 100; max-width: calc(100vw - 32px); text-align: center;
   }
   .toast.show { opacity: 1; }
+  .badge { font-size: 12.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--good-soft); color: var(--good); white-space: nowrap; }
+  .badge.bad { background: var(--bad-soft); color: var(--bad); }
+  .group-label { font-size: 12px; font-weight: 750; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 14px 0 0; }
+  .move { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .group-label + .move { border-top: 0; }
+  .move-main { flex: 1; display: flex; gap: 12px; align-items: flex-start; cursor: pointer; min-width: 0; }
+  .move-main input { width: 22px; height: 22px; margin: 1px 0 0; accent-color: var(--good); flex-shrink: 0; }
+  .move.done .check-text strong { color: var(--muted); text-decoration: line-through; }
+  .copy {
+    font: inherit; font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer;
+    background: var(--halifax-soft); color: var(--halifax); border: 0; border-radius: 10px; padding: 7px 10px;
+  }
+  .copy:active { transform: scale(.97); }
+  .move.done .copy { background: var(--surface-2); color: var(--muted); }
+  .wf { border-top: 1px solid var(--line); }
+  .wf > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 11px 0; }
+  .wf > summary::-webkit-details-marker { display: none; }
+  .wf-label small { display: block; color: var(--muted); font-size: 12.5px; font-weight: 500; }
+  .wf > summary strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .wf > summary strong::after { content: " \25BE"; color: var(--accent); font-size: 12px; }
+  .wf[open] > summary strong::after { content: " \25B4"; }
+  .wf-body { padding: 0 0 12px 12px; margin-left: 4px; border-left: 2px solid var(--line); }
+  .wf-total { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 10px 12px; margin: 6px 0; border-radius: 10px; background: var(--surface-2); font-weight: 700; }
+  .wf-total strong { font-variant-numeric: tabular-nums; }
+  .wf-total.start { background: var(--halifax-soft); }
+  .wf-total.neg strong { color: var(--bad); }
+  .wf-line, .wf-weeks { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .wf-weeks small { display: block; color: var(--muted); font-size: 12.5px; }
+  .item { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 15px; }
+  .wf-body > .item:first-child { border-top: 0; }
+  .item-main { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .item-main small { display: block; color: var(--muted); font-size: 12.5px; }
+  .item strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .item.skipped .item-main span, .item.skipped strong { text-decoration: line-through; color: var(--muted); }
+  .mini { font: inherit; font-size: 13px; font-weight: 650; padding: 4px 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--accent); cursor: pointer; white-space: nowrap; }
+  .adj-editor { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 6px 0 10px; }
+  .adj-editor .lbl { margin-bottom: 8px; }
+  .adj-editor input[type=text], .adj-editor input[type=date], .adj-editor select { background: var(--surface); }
+  .adj-editor .money-input { background: var(--surface); }
+  .ops { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
   footer.foot { color: var(--muted); font-size: 12.5px; text-align: center; padding: 8px 0 0; }
 </style>
 </head>
@@ -426,12 +466,23 @@ const Engine = (() => {
     return datesInRange(b.day, from, to);
   }
 
-  function billsBetween(state, from, to) {
+  // A bill can be changed or skipped for one date only: state.adjust['billId:YYYY-MM-DD']
+  function occurrence(state, b, d) {
+    const a = state.adjust && state.adjust[`${b.id}:${d}`];
+    if (a && a.skip) return { amount: 0, skipped: true };
+    if (a && a.amount != null) return { amount: a.amount, changed: a.amount !== b.amount };
+    return { amount: b.amount };
+  }
+
+  function billsBetween(state, from, to, withSkipped) {
     const out = [];
     for (const b of state.bills || []) {
       if (!live(b)) continue;
       for (const d of billDates(b, from, to)) {
-        out.push({ key: `b:${b.id}:${d}`, id: b.id, name: b.name, amount: b.amount, date: d,
+        const o = occurrence(state, b, d);
+        if (o.skipped && !withSkipped) continue;
+        out.push({ key: `b:${b.id}:${d}`, id: b.id, name: b.name, amount: o.amount, usual: b.amount,
+          changed: !!o.changed, skipped: !!o.skipped, date: d,
           debtId: b.debtId || null, reimbursed: !!b.reimbursed, once: !!b.once });
       }
     }
@@ -451,7 +502,7 @@ const Engine = (() => {
       const from = addDays(debt.updated, 1);
       for (const b of state.bills || []) {
         if (!live(b) || b.debtId !== debt.id) continue;
-        bal -= b.amount * billDates(b, from, until).length;
+        for (const d of billDates(b, from, until)) bal -= occurrence(state, b, d).amount;
       }
     }
     for (const [mid, m] of Object.entries(state.months || {})) {
@@ -484,45 +535,61 @@ const Engine = (() => {
     const m = (state.months && state.months[id]) || {};
     const per = period(id, state);
 
-    // Steps 2 and 3: what has to stay in Halifax
-    const rest = billsBetween(state, per.payday, per.monthEnd);
-    const next = billsBetween(state, per.nextStart, per.nextEnd);
+    // What has to stay in Halifax: the rest of this month plus all of next month
+    const rest = billsBetween(state, per.payday, per.monthEnd, true);
+    const next = billsBetween(state, per.nextStart, per.nextEnd, true);
     const restTotal = sum(rest);
     const nextTotal = sum(next);
     const buffer = s.buffer || 0;
     const keep = restTotal + nextTotal + buffer;
 
-    // Step 1: what is there. Without a Halifax balance, assume last month kept back exactly enough.
+    // What is there. Without a Halifax balance, assume last month kept back exactly enough.
     const pay = m.pay || 0;
     const entered = m.halifax != null;
     const halifax = entered ? m.halifax : pay + restTotal + buffer;
     const free = halifax - keep;
 
-    // Step 4: Monzo for next month
+    // Monzo for next month: weekly amounts times the weeks, with any changes for this month only
     const mondays = weeksIn(per.nextId, s.weekDay == null ? 1 : s.weekDay);
     const weeks = m.weeks != null ? m.weeks : mondays.length;
+    const potOver = m.pots || {};
     const pots = { shop: [], spend: [] };
     for (const b of state.budgets || []) {
       if (!live(b) || !pots[b.pot]) continue;
-      pots[b.pot].push({ key: `p:${b.id}`, id: b.id, name: b.name, amount: b.amount, per: b.per,
-        total: b.per === 'week' ? b.amount * weeks : b.amount });
+      const usual = b.per === 'week' ? b.amount * weeks : b.amount;
+      const total = potOver[b.id] != null ? potOver[b.id] : usual;
+      pots[b.pot].push({ key: `p:${b.id}`, id: b.id, name: b.name, amount: b.amount, per: b.per, usual, total, changed: total !== usual });
+    }
+    for (const x of m.potExtras || []) {
+      if (pots[x.pot] && x.amount > 0) pots[x.pot].push({ key: `px:${x.id}`, id: x.id, name: x.name, amount: x.amount, total: x.amount, extra: true });
     }
     const shop = pots.shop.reduce((t, x) => t + x.total, 0);
     const spend = pots.spend.reduce((t, x) => t + x.total, 0);
     const monzo = shop + spend;
 
-    // Step 5: other payday transfers
-    const transfers = (state.transfers || []).filter(live).map(t => ({ key: `t:${t.id}`, id: t.id, name: t.name, amount: t.amount }));
+    // Payday transfers, with this month's changes and one-off payments
+    const tOver = m.transferAmounts || {};
+    const transfers = [];
+    for (const t of state.transfers || []) {
+      if (!live(t)) continue;
+      const amount = tOver[t.id] != null ? tOver[t.id] : t.amount;
+      transfers.push({ key: `t:${t.id}`, id: t.id, name: t.name, amount, usual: t.amount, changed: amount !== t.amount, skipped: amount === 0 });
+    }
+    for (const x of m.transferExtras || []) {
+      if (x.amount > 0) transfers.push({ key: `tx:${x.id}`, id: x.id, name: x.name, amount: x.amount, debtId: x.debtId || null, extra: true });
+    }
     const transfersTotal = sum(transfers);
-    const leftover = free - monzo - transfersTotal;
 
-    // Step 6: leftover to savings, or some towards a debt
+    // Money brought back from savings to cover a short month
+    const fromSavings = Math.max(0, m.fromSavings || 0);
+    const leftover = free + fromSavings - monzo - transfersTotal;
+
     const debts = (state.debts || []).map(d => ({
       id: d.id, name: d.name, apr: d.apr || 0,
       now: debtBalance(d, state, today),
       base: debtBalance(d, state, today, id),
       monthly: monthlyFor(d.id, state),
-      nextMonth: sum(next.filter(l => l.debtId === d.id))
+      nextMonth: sum(next.filter(l => l.debtId === d.id)) + sum(transfers.filter(t => t.debtId === d.id))
     }));
     let extra = 0, extraDebt = null;
     if (leftover > 0 && m.extra && m.extra.amount > 0) {
@@ -531,19 +598,20 @@ const Engine = (() => {
     }
     const toSavings = Math.max(0, leftover - extra);
 
-    // Step 7: where you stand
+    // Where you stand
     const ticks = m.ticks || {};
     const savingsNow = (state.savings && state.savings.balance) || 0;
-    const savingsAfter = savingsNow + (ticks['x:savings'] ? 0 : toSavings);
+    const savingsAfter = savingsNow + (ticks['x:savings'] ? 0 : toSavings) - (ticks['x:fromsavings'] ? 0 : fromSavings);
     const debtTotal = debts.reduce((t, d) => t + d.now, 0);
-    const debtAfter = Math.max(0, debtTotal - (ticks['x:debt'] ? 0 : extra));
+    const pendingDebt = (ticks['x:debt'] ? 0 : extra) + sum(transfers.filter(t => t.debtId && !ticks[t.key]));
+    const debtAfter = Math.max(0, debtTotal - pendingDebt);
     const net = savingsAfter - debtAfter;
-    const debtNextMonth = sum(next.filter(l => l.debtId)) + extra;
+    const debtNextMonth = debts.reduce((t, d) => t + d.nextMonth, 0) + extra;
 
     const reimb = (state.bills || []).filter(b => live(b) && b.reimbursed && !b.once);
     const reimbTotal = sum(reimb);
 
-    // Halifax check for any day in this period: everything still to come up to the end of next month.
+    // Halifax check for any day in this period: everything still to come up to the end of next month
     let todayCheck = null;
     if (today >= per.payday && today <= per.end) {
       const still = billsBetween(state, today, per.nextEnd);
@@ -551,14 +619,14 @@ const Engine = (() => {
     }
 
     let run = keep;
-    const timeline = [...rest, ...next].map(l => { run -= l.amount; return { ...l, after: run }; });
+    const timeline = [...rest, ...next].filter(l => !l.skipped).map(l => { run -= l.amount; return { ...l, after: run }; });
 
-    const balanced = leftover < 0 || keep + monzo + transfersTotal + extra + toSavings === halifax;
+    const balanced = leftover < 0 || keep + monzo + transfersTotal + extra + toSavings === halifax + fromSavings;
 
     return {
       period: per, pay, halifax, entered, rest, next, restTotal, nextTotal, buffer, keep, free,
       weeks, mondays, autoWeeks: mondays.length, pots, shop, spend, monzo, transfers, transfersTotal,
-      leftover, extra, extraDebt, toSavings, debts, debtTotal, debtAfter, savingsNow, savingsAfter, net,
+      fromSavings, leftover, extra, extraDebt, toSavings, debts, debtTotal, debtAfter, savingsNow, savingsAfter, net,
       debtNextMonth, reimb, reimbTotal, todayCheck, timeline, balanced,
       isPast: today > per.end, isFuture: today < per.payday
     };
@@ -620,7 +688,7 @@ function defaults() {
     settings: { payDay: 15, weekendRule: 'before', weekDay: 1, buffer: 0, savingsLabel: 'Monzo savings pot' },
     bills: [], budgets: [], transfers: [], debts: [],
     savings: { balance: 0, updated: '' },
-    months: {},
+    months: {}, adjust: {},
     meta: { created: today(), updatedAt: 0, lastBackup: '' }
   };
 }
@@ -644,6 +712,7 @@ function normalise(s) {
     bills: arr('bills'), budgets: arr('budgets'), transfers: arr('transfers'), debts: arr('debts'),
     savings: { ...d.savings, ...(s.savings || {}) },
     months: s.months && typeof s.months === 'object' ? s.months : {},
+    adjust: s.adjust && typeof s.adjust === 'object' ? s.adjust : {},
     meta: { ...d.meta, ...(s.meta || {}) }
   };
 }
@@ -686,7 +755,7 @@ function hasRealData(s) {
 }
 
 let state = load();
-const view = { tab: 'payday', monthId: Engine.monthIdFor(today(), state), open: {}, editDebt: null };
+const view = { tab: 'payday', monthId: Engine.monthIdFor(today(), state), open: {}, editDebt: null, adj: null, add: null, whatIf: null };
 
 function saveLocal() {
   try { localStorage.setItem(KEY, JSON.stringify(state)); }
@@ -924,18 +993,6 @@ function renderAll() { renderHeader(); renderTab(); }
 // ---------- Payday tab ----------
 const lineHtml = (name, amount, sub, cls) =>
   `<div class="line ${cls || ''}"><span>${esc(name)}${sub ? `<small>${esc(sub)}</small>` : ''}</span><strong>${money(amount)}</strong></div>`;
-const runningHtml = (label, amount) =>
-  `<div class="running ${amount < 0 ? 'neg' : ''}"><span>${label}</span><strong>${amount < 0 ? '&minus;' : ''}${money(Math.abs(amount))}</strong></div>`;
-const stepHead = (n, title, right) =>
-  `<div class="step-head"><span class="step-num">${n}</span><h2>${title}</h2>${right ? `<span class="right">${right}</span>` : ''}</div>`;
-
-function billListHtml(lines, id) {
-  if (!lines.length) return '<p class="empty">No bills in this window.</p>';
-  const t = today();
-  return `<details class="inline" id="${id}" ${view.open[id] ? 'open' : ''}><summary>See the ${plural(lines.length, 'bill')}</summary>
-    ${lines.map(l => `<div class="line ${l.date < t ? 'muted' : ''}"><span>${esc(l.name)}<small>${fmtDate(l.date)}${l.debtId ? ' &middot; pays off ' + esc(debtName(l.debtId)) : ''}${l.reimbursed ? ' &middot; work pays back' : ''}</small></span><strong>${money(l.amount)}</strong></div>`).join('')}
-  </details>`;
-}
 
 function noticesHtml(p) {
   const out = [];
@@ -961,11 +1018,16 @@ function noticesHtml(p) {
 function renderPayday() {
   const el = $('#tab-payday');
   const id = view.monthId;
+  // Pay is usually the same, so fill it in from last month (you can change it)
+  const prev = state.months[Engine.shiftMonth(id, -1)];
+  if ((!state.months[id] || state.months[id].pay == null) && prev && prev.pay && id >= Engine.monthIdFor(today(), state)) {
+    month(id).pay = prev.pay;
+    month(id).payFromLast = true;
+    save();
+  }
   const p = Engine.buildPlan(state, id, today());
   const m = state.months[id] || {};
-  const prev = state.months[Engine.shiftMonth(id, -1)];
   const per = p.period;
-  const reimbNames = p.reimb.map(b => b.name);
   el.innerHTML = `
     <div class="month-nav">
       <button class="nav-btn" data-action="prev-month" aria-label="Previous payday">&#8249;</button>
@@ -974,25 +1036,27 @@ function renderPayday() {
     </div>
     ${noticesHtml(p)}
     <div class="card">
-      ${stepHead(1, 'What came in')}
-      <div class="field">
-        <label for="inPay">Pay received</label>
-        <div class="money-input big"><span>&pound;</span><input id="inPay" inputmode="decimal" autocomplete="off" enterkeyhint="done" data-month-field="pay" value="${toPounds(m.pay)}" placeholder="0.00"></div>
-        ${!m.pay && prev && prev.pay ? `<button class="link" id="samePay" data-action="same-pay">Use last month's ${money(prev.pay)}</button>` : ''}
+      <h2>What came in</h2>
+      <div class="grid2">
+        <div class="field">
+          <label for="inPay">Pay received</label>
+          <div class="money-input"><span>&pound;</span><input id="inPay" inputmode="decimal" autocomplete="off" enterkeyhint="done" data-month-field="pay" value="${toPounds(m.pay)}" placeholder="0.00"></div>
+          ${m.payFromLast ? '<p class="hint" id="payHint">Same as last month. Change it if it was different.</p>' : ''}
+        </div>
+        <div class="field">
+          <label for="inHalifax">Halifax balance now</label>
+          <div class="money-input big"><span>&pound;</span><input id="inHalifax" inputmode="decimal" autocomplete="off" enterkeyhint="done" data-month-field="halifax" value="${toPounds(m.halifax)}" placeholder="From the app"></div>
+          <p class="hint">Once your pay has landed. Makes the plan exact.</p>
+        </div>
       </div>
-      ${p.reimbTotal ? `<div class="field">
-        <div class="lbl">Work pays back ${money(p.reimbTotal)}</div>
-        <p class="hint" style="margin:0 0 8px">${esc(listJoin(reimbNames))}. Has it reached Halifax?</p>
+      ${p.reimbTotal ? `<div class="field" style="margin-bottom:6px">
+        <div class="lbl">Work pays back ${money(p.reimbTotal)} (${esc(listJoin(p.reimb.map(b => b.name)))}). Is it in Halifax yet?</div>
         <div class="seg" role="group" aria-label="Has the money from work arrived?">
-          <button type="button" data-action="reimb" data-v="1" aria-pressed="${m.reimbLanded === true}">Yes, it's in</button>
+          <button type="button" data-action="reimb" data-v="1" aria-pressed="${m.reimbLanded === true}">Yes</button>
           <button type="button" data-action="reimb" data-v="0" aria-pressed="${m.reimbLanded === false}">Not yet</button>
         </div>
       </div>` : ''}
-      <div class="field">
-        <label for="inHalifax">Halifax balance now</label>
-        <div class="money-input"><span>&pound;</span><input id="inHalifax" inputmode="decimal" autocomplete="off" enterkeyhint="done" data-month-field="halifax" value="${toPounds(m.halifax)}" placeholder="From your Halifax app"></div>
-        <p class="hint">Once your pay has landed, open the Halifax app and type the balance. It makes the plan exact.</p>
-      </div>
+      <div id="beforePay"></div>
       <details class="inline" id="paydayEdit" ${view.open.paydayEdit ? 'open' : ''}><summary>Paid on a different day?</summary>
         <div class="inline-row">
           <input type="date" id="paydayOverride" value="${per.payday}" aria-label="Payday date">
@@ -1004,135 +1068,229 @@ function renderPayday() {
   renderPlan();
 }
 
+function beforePayHtml(p) {
+  const mn = monthName(p.period.id);
+  const need = p.restTotal + p.buffer;
+  if (!p.entered) {
+    return p.pay ? `<div class="status note">No Halifax balance yet, so this assumes you kept back ${money(need)} for the rest of ${mn}. Type the balance to check.</div>` : '';
+  }
+  if (!p.pay) return '';
+  const before = p.halifax - p.pay;
+  if (before >= need) return `<div class="status ok">&#10003; Before your pay, Halifax had ${money(before)}. That already covers the rest of ${mn} (${money(need)}), so you're a month ahead.</div>`;
+  return `<div class="status note">Before your pay, Halifax had ${money(before)}: ${money(need - before)} less than the rest of ${mn} needs. Part of this pay covers it.</div>`;
+}
+
 function renderPlan() {
-  const p = Engine.buildPlan(state, view.monthId, today());
   const out = $('#planOut');
   if (!out) return;
-  const hasPay = p.pay > 0 || p.entered;
+  const p = Engine.buildPlan(state, view.monthId, today());
+  $('#beforePay').innerHTML = beforePayHtml(p);
+  const ready = p.pay > 0 || p.entered;
   out.innerHTML = [
-    stepRestHtml(p), stepNextHtml(p),
-    hasPay ? stepMonzoHtml(p) : '', hasPay ? stepTransfersHtml(p) : '', hasPay ? stepLeftHtml(p) : '',
-    hasPay ? standHtml(p) : '', hasPay ? checklistHtml(p) : waitingHtml(p),
-    todayCheckHtml(p), timelineHtml(p), workingHtml(p, hasPay)
+    ready ? movesHtml(p) : `<div class="card"><p style="margin:0"><strong>Enter your pay or Halifax balance above</strong> to see your payday moves.</p></div>`,
+    addsUpHtml(p, ready),
+    ready ? standHtml(p) : '',
+    todayCheckHtml(p),
+    timelineHtml(p)
   ].join('');
-  if (hasPay && !p.isPast) snapshot(p);
+  if (ready && !p.isPast) snapshot(p);
 }
 
-function waitingHtml(p) {
-  return `<div class="card"><p style="margin:0"><strong>Enter your pay or Halifax balance above</strong> to see what goes to Monzo, your daughter's savings and your savings pot.</p>
-    <p class="hint">Next month needs ${money(p.nextTotal)} in bills before anything else.</p></div>`;
-}
-
-function stepRestHtml(p) {
-  const per = p.period;
-  let status;
-  if (p.entered) {
-    status = p.halifax >= p.restTotal + p.buffer
-      ? `<div class="status ok">&#10003; Covered. Halifax has enough for the rest of ${monthName(per.id)}.</div>`
-      : `<div class="status bad">Halifax is ${money(p.restTotal + p.buffer - p.halifax)} short for the rest of ${monthName(per.id)}. Top it up today.</div>`;
-  } else {
-    status = `<div class="status note">Assumed covered by what you kept back last month. Enter your Halifax balance to check.</div>`;
-  }
-  return `<div class="card">
-    ${stepHead(2, `Rest of ${monthName(per.id)}`, money(p.restTotal))}
-    <p class="muted" style="margin:0">Bills from ${fmtShort(per.payday)} to ${fmtShort(per.monthEnd)}. Keep this in Halifax.</p>
-    ${billListHtml(p.rest, 'restList')}
-    ${status}
-  </div>`;
-}
-
-function stepNextHtml(p) {
-  const per = p.period;
-  const next = monthName(per.nextId);
-  const covered = p.halifax >= p.keep;
-  const status = !p.entered && !p.pay ? ''
-    : covered ? `<div class="status ok">&#10003; ${next} is fully covered.</div>`
-    : `<div class="status bad">${money(p.keep - p.halifax)} short of covering all of ${next}.</div>`;
-  return `<div class="card">
-    ${stepHead(3, `All of ${next}`, money(p.nextTotal))}
-    <p class="muted" style="margin:0">Every bill from 1 to ${Engine.toDate(per.nextEnd).getDate()} ${MON[Engine.toDate(per.nextEnd).getMonth()]}.</p>
-    ${billListHtml(p.next, 'nextList')}
-    <div class="big-result r-halifax">
-      <div class="label">Leave in Halifax</div>
-      <div class="amount">${money(p.keep)}</div>
-      <div class="note">Rest of ${monthName(per.id)} ${money(p.restTotal)} + ${next} ${money(p.nextTotal)}${p.buffer ? ` + ${money(p.buffer)} buffer` : ''}. Covers everything until ${fmtShort(per.nextEnd)}.</div>
-    </div>
-    ${status}
-    ${p.entered || p.pay ? runningHtml('Free to share out', p.free) : ''}
-    ${!p.entered && p.pay ? '<p class="hint">Worked out from your pay. Enter your Halifax balance above for the exact figure.</p>' : ''}
-  </div>`;
-}
-
-function stepMonzoHtml(p) {
-  const next = monthName(p.period.nextId);
+function movesHtml(p) {
   const s = state.settings;
-  const day = DOW_LONG[s.weekDay == null ? 1 : s.weekDay];
-  const potLines = list => list.map(x => lineHtml(x.name, x.total, x.per === 'week' ? `${money(x.amount)} a week × ${p.weeks}` : 'Each month')).join('');
-  return `<div class="card">
-    ${stepHead(4, `Monzo for ${next}`, money(p.monzo))}
-    <div class="line" style="border-top:0;align-items:center">
-      <span>${next} has <strong>${plural(p.weeks, 'week')}</strong><small>${p.weeks === p.autoWeeks ? `${day}s: ${p.mondays.join(', ')}` : `Changed from ${p.autoWeeks}`}</small></span>
-      <span class="stepper"><button type="button" data-action="weeks" data-d="-1" aria-label="One week fewer">&minus;</button><button type="button" data-action="weeks" data-d="1" aria-label="One week more">+</button></span>
-    </div>
-    <div class="lbl" style="margin-top:10px">Shop pot</div>
-    ${p.pots.shop.length ? potLines(p.pots.shop) : '<p class="empty">Nothing set. Add food, petrol and so on in Bills.</p>'}
-    ${lineHtml('Shop pot total', p.shop, '', 'total')}
-    <div class="lbl" style="margin-top:12px">Spend pot</div>
-    ${p.pots.spend.length ? potLines(p.pots.spend) : '<p class="empty">Nothing set yet.</p>'}
-    ${lineHtml('Spend pot total', p.spend, '', 'total')}
-    ${runningHtml('Left after Monzo', p.free - p.monzo)}
-  </div>`;
-}
-
-function stepTransfersHtml(p) {
-  return `<div class="card">
-    ${stepHead(5, p.transfers.length === 1 ? esc(p.transfers[0].name) : 'Payday transfers', money(p.transfersTotal))}
-    ${p.transfers.length ? p.transfers.map(t => lineHtml(t.name, t.amount)).join('') : '<p class="empty">None set.</p>'}
-    ${runningHtml('Left over', p.leftover)}
-  </div>`;
-}
-
-function stepLeftHtml(p) {
-  const s = state.settings;
-  const next = monthName(p.period.nextId);
-  if (p.leftover < 0) {
-    const short = -p.leftover;
-    const tips = [];
-    if (p.spend >= short) tips.push(`Trim the Spend pot to ${money(p.spend - short)} for ${next}.`);
-    else if (p.spend > 0) tips.push(`Even with no Spend pot you'd be ${money(short - p.spend)} short.`);
-    if (p.savingsNow > 0) tips.push(`Move ${money(Math.min(short, p.savingsNow))} back from your savings pot.`);
-    tips.push('Nothing goes to savings this month.');
-    return `<div class="card">${stepHead(6, 'Left over')}
-      <div class="big-result r-bad"><div class="label">Short for ${next}</div><div class="amount">${money(short)}</div></div>
-      <ul class="notes" style="color:var(--ink)">${tips.map(t => `<li>${t}</li>`).join('')}</ul></div>`;
-  }
-  const open = p.debts.filter(d => d.base > 0);
   const m = state.months[p.period.id] || {};
-  const pricey = open.filter(d => d.apr > 0).sort((a, b) => b.apr - a.apr)[0];
-  const showExtra = view.open.extra || p.extra > 0;
+  const ticks = m.ticks || {};
+  const next = monthName(p.period.nextId);
+  const hal = [], mon = [], then = [];
+  const send = p.monzo + p.toSavings;
+  if (send > 0) {
+    const parts = [p.shop && `Shop ${money(p.shop)}`, p.spend && `Spend ${money(p.spend)}`, p.toSavings && `Savings ${money(p.toSavings)}`].filter(Boolean);
+    hal.push({ key: 'm:send', title: 'Send to Monzo', sub: parts.join(' + '), amount: send });
+  }
+  for (const t of p.transfers) {
+    if (t.amount > 0) hal.push({ key: t.key, title: t.name, sub: t.debtId ? `Pays off ${debtName(t.debtId)}` : t.extra ? `One-off for ${next}` : '', amount: t.amount, debtId: t.debtId });
+  }
+  if (p.extra) hal.push({ key: 'x:debt', title: `Extra off ${debtName(p.extraDebt)}`, amount: p.extra, debtId: p.extraDebt });
+  if (p.fromSavings) mon.push({ key: 'x:fromsavings', title: 'Take this out of your savings pot and send it to Halifax', sub: 'Ticking this takes it off your savings figure.', amount: p.fromSavings });
+  if (p.shop) mon.push({ key: 'p:shop', title: 'Shop pot', amount: p.shop });
+  if (p.spend) mon.push({ key: 'p:spend', title: 'Spend pot', amount: p.spend });
+  if (p.toSavings) mon.push({ key: 'x:savings', title: s.savingsLabel, sub: 'Ticking this adds it to your savings figure.', amount: p.toSavings });
+  if (p.reimbTotal && m.reimbLanded === false) then.push({ key: 'r:later', title: `When work's ${money(p.reimbTotal)} lands, move it to your ${s.savingsLabel}`, amount: p.reimbTotal });
+  then.push({ key: 'h:check', title: 'Halifax should now show', sub: `Enough for every bill until ${fmtShort(p.period.nextEnd)}.`, amount: p.keep, noCopy: true });
+
+  let short = '';
+  if (p.leftover < 0) {
+    const gap = -p.leftover;
+    const fixes = [];
+    const fromSav = Math.min(gap, p.savingsNow);
+    if (fromSav > 0) fixes.push(`<button class="btn btn-sm" data-action="fix-savings" data-v="${fromSav}">Use ${money(fromSav)} from savings</button>`);
+    const cut = Math.min(gap, p.spend);
+    if (cut > 0) fixes.push(`<button class="btn btn-ghost btn-sm" data-action="fix-spend" data-v="${cut}">Cut Spend pot by ${money(cut)}</button>`);
+    short = `<div class="big-result r-bad" style="margin-top:0"><div class="label">Short for ${next}</div><div class="amount">${money(gap)}</div>
+      <div class="note">Tap a fix and the moves update. Or change something below.</div></div>
+      ${fixes.length ? `<div class="actions">${fixes.join('')}</div>` : ''}`;
+  }
+
+  const row = x => `<div class="move ${ticks[x.key] ? 'done' : ''}">
+      <label class="move-main"><input type="checkbox" data-tick="${esc(x.key)}" data-amount="${x.amount || 0}" data-debt="${esc(x.debtId || '')}" ${ticks[x.key] ? 'checked' : ''}>
+        <span class="check-text"><strong>${esc(x.title)}</strong>${x.sub ? `<small>${esc(x.sub)}</small>` : ''}</span></label>
+      ${x.noCopy ? `<span class="check-amt">${money(x.amount)}</span>` : `<button class="copy" data-copy="${toPounds(x.amount)}" aria-label="Copy ${money(x.amount)}">${money(x.amount)}</button>`}
+    </div>`;
+  const all = [...hal, ...mon, ...then];
+  const done = all.filter(x => ticks[x.key]).length;
   return `<div class="card">
-    ${stepHead(6, 'Left over')}
-    <div class="big-result r-good">
-      <div class="label">Into your ${esc(s.savingsLabel)}</div>
-      <div class="amount">${money(p.toSavings)}</div>
-      ${p.extra ? `<div class="note">Plus ${money(p.extra)} off ${esc(debtName(p.extraDebt))}.</div>` : ''}
-    </div>
-    ${pricey ? `<p class="hint">${esc(pricey.name)} charges ${pricey.apr}% interest. Paying that off saves more than savings earn.</p>` : ''}
-    ${open.length && p.leftover > 0 ? (showExtra ? `<div class="grid2" style="margin-top:12px">
-      <div class="field"><label for="extraDebt">Pay some off</label>
-        <select id="extraDebt" data-extra="debtId">${open.map(d => `<option value="${esc(d.id)}" ${d.id === (m.extra && m.extra.debtId) ? 'selected' : ''}>${esc(d.name)} (${money(d.base)})</option>`).join('')}</select></div>
-      <div class="field"><label for="extraAmt">Amount</label>
-        <div class="money-input"><span>&pound;</span><input id="extraAmt" inputmode="decimal" autocomplete="off" enterkeyhint="done" data-extra="amount" value="${p.extra ? toPounds(p.extra) : ''}" placeholder="0.00"></div></div>
-    </div>` : '<button class="link" data-action="show-extra">Put some towards a debt instead</button>') : ''}
+    <div class="card-head"><h2>Your payday moves</h2><span class="progress-text">${done} of ${all.length} done</span></div>
+    ${!p.entered ? '<p class="status note" style="margin:0 0 6px">Based on your pay. Type your Halifax balance above for exact figures.</p>' : ''}
+    ${short}
+    ${hal.length ? `<div class="group-label">In the Halifax app</div>${hal.map(row).join('')}` : ''}
+    ${mon.length ? `<div class="group-label">In the Monzo app</div>${mon.map(row).join('')}` : ''}
+    <div class="group-label">Then</div>${then.map(row).join('')}
+    <p class="hint">Tap an amount to copy it, then paste it into your banking app.</p>
   </div>`;
+}
+
+// One line of the running list, with a Change or Remove button and an optional editor under it
+const itemRow = x => `<div class="item ${x.skipped ? 'skipped' : ''}">
+    <div class="item-main"><span>${esc(x.name)}</span>${x.sub ? `<small>${x.sub}</small>` : ''}</div>
+    <strong>${money(x.amount)}</strong>
+    <button class="mini" data-action="${x.act}" data-key="${esc(x.key || '')}" data-id="${esc(x.id || '')}">${x.label}</button>
+  </div>${x.editor || ''}`;
+
+function changeEditor(key, title, value, usual, changed, skipLabel, foot) {
+  return `<div class="adj-editor">
+    <div class="lbl">${title}</div>
+    <div class="inline-row"><div class="money-input"><span>&pound;</span><input id="adjAmt" inputmode="decimal" autocomplete="off" enterkeyhint="done" value="${toPounds(value)}"></div>
+      <button class="btn btn-sm" data-action="adj-save" data-key="${esc(key)}">Save</button></div>
+    <div class="actions">
+      <button class="btn btn-ghost btn-sm" data-action="adj-skip" data-key="${esc(key)}">${skipLabel}</button>
+      ${changed ? `<button class="btn btn-ghost btn-sm" data-action="adj-reset" data-key="${esc(key)}">Back to ${money(usual)}</button>` : ''}
+      <button class="link" data-action="adj-close">Cancel</button>
+    </div>
+    <p class="hint">${foot}</p>
+  </div>`;
+}
+
+function addForm(formId, kind, label, o = {}) {
+  if (view.add !== formId) return `<button class="link" data-action="add-open" data-form="${formId}">+ ${label}</button>`;
+  return `<div class="adj-editor">
+    <div class="lbl">${label}</div>
+    <input type="text" id="addName" maxlength="40" autocomplete="off" placeholder="${o.placeholder || 'What is it?'}">
+    <div class="inline-row" style="margin-top:8px">
+      <div class="money-input"><span>&pound;</span><input id="addAmt" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+      ${kind === 'bill' ? `<input type="date" id="addDate" min="${o.min}" max="${o.max}" value="${o.min}" aria-label="Date it comes out" style="max-width:170px">` : ''}
+    </div>
+    ${kind === 'transfer' && state.debts.length ? `<select id="addDebt" style="margin-top:8px"><option value="">Not paying off a debt</option>${state.debts.map(d => `<option value="${esc(d.id)}">Pays off ${esc(d.name)}</option>`).join('')}</select>` : ''}
+    <div class="actions"><button class="btn btn-sm" data-action="add-save" data-kind="${kind}" data-pot="${o.pot || ''}" data-section="${o.section || ''}">Add</button><button class="link" data-action="add-close">Cancel</button></div>
+  </div>`;
+}
+
+function billItems(lines, section, min, max) {
+  const rows = lines.map(l => itemRow({
+    key: l.key, id: l.id, name: l.name, amount: l.amount, skipped: l.skipped,
+    sub: [fmtDate(l.date), l.skipped ? 'skipped this time' : l.changed ? `usually ${money(l.usual)}` : '', l.once ? 'one-off' : '', l.reimbursed ? 'work pays back' : ''].filter(Boolean).join(' &middot; '),
+    act: l.once ? 'remove-bill' : 'adj-open', label: l.once ? 'Remove' : 'Change',
+    editor: view.adj === l.key ? changeEditor(l.key, `${esc(l.name)} on ${fmtDate(l.date)} only`, l.skipped ? l.usual : l.amount, l.usual, l.changed || l.skipped, 'Skip it this time', `Other months stay at ${money(l.usual)}. To change it for good, edit it in Bills.`) : ''
+  })).join('');
+  return (rows || '<p class="empty">No bills here.</p>') + addForm(`add-${section}`, 'bill', 'Add a one-off bill', { min, max, section, placeholder: 'e.g. MOT' });
+}
+
+function potItems(p, list, pot) {
+  const next = monthName(p.period.nextId);
+  const rows = list.map(x => itemRow({
+    key: x.key, id: x.id, name: x.name, amount: x.total, skipped: !x.extra && x.total === 0 && x.usual > 0,
+    sub: x.extra ? `one-off for ${next}` : (x.per === 'week' ? `${money(x.amount)} a week &times; ${p.weeks}` : 'each month') + (x.changed ? ` &middot; usually ${money(x.usual)}` : ''),
+    act: x.extra ? 'remove-potextra' : 'adj-open', label: x.extra ? 'Remove' : 'Change',
+    editor: view.adj === x.key ? changeEditor(x.key, `${esc(x.name)} for ${next} only`, x.total, x.usual, x.changed, `Nothing for ${next}`, 'Other months stay as usual. To change it for good, edit it in Bills.') : ''
+  })).join('');
+  return (rows || '<p class="empty">Nothing set.</p>') + addForm(`add-${pot}`, 'pot', pot === 'shop' ? 'Add extra to the Shop pot' : 'Add extra to the Spend pot', { pot, section: pot, placeholder: pot === 'shop' ? 'e.g. Christmas food' : 'e.g. Birthday night out' });
+}
+
+function transferItems(p) {
+  const next = monthName(p.period.nextId);
+  const rows = p.transfers.map(t => itemRow({
+    key: t.key, id: t.id, name: t.name, amount: t.amount, skipped: t.skipped,
+    sub: t.extra ? (t.debtId ? `one-off &middot; pays off ${esc(debtName(t.debtId))}` : 'one-off') : t.skipped ? 'skipped this time' : t.changed ? `usually ${money(t.usual)}` : '',
+    act: t.extra ? 'remove-transfer' : 'adj-open', label: t.extra ? 'Remove' : 'Change',
+    editor: view.adj === t.key ? changeEditor(t.key, `${esc(t.name)} for ${next} only`, t.skipped ? t.usual : t.amount, t.usual, t.changed, 'Skip it this time', 'Other months stay as usual.') : ''
+  })).join('');
+  return (rows || '<p class="empty">None set.</p>') + addForm('add-transfer', 'transfer', 'Add a one-off payment', { section: 'transfers', placeholder: 'e.g. Leyla' });
+}
+
+function addsUpHtml(p, ready) {
+  const per = p.period;
+  const s = state.settings;
+  const mn = monthName(per.id), nx = monthName(per.nextId);
+  const sec = (id, title, sub, amount, body) => `<details class="wf" id="${id}" ${view.open[id] ? 'open' : ''}>
+      <summary><span class="wf-label">&minus; ${title}${sub ? `<small>${sub}</small>` : ''}</span><strong>${money(amount)}</strong></summary>
+      <div class="wf-body">${body}</div></details>`;
+  const total = (label, amount, cls) => `<div class="wf-total ${cls || ''} ${amount < 0 ? 'neg' : ''}"><span>${label}</span><strong>${amount < 0 ? '&minus;' : ''}${money(Math.abs(amount))}</strong></div>`;
+  const out = [];
+  if (ready) out.push(total(p.entered ? 'Halifax balance now' : `Pay plus ${money(p.restTotal + p.buffer)} kept back`, p.halifax, 'start'));
+  out.push(sec('wf-rest', `Rest of ${mn}`, `${plural(p.rest.filter(l => !l.skipped).length, 'bill')}, ${fmtShort(per.payday)} to ${fmtShort(per.monthEnd)}`, p.restTotal, billItems(p.rest, 'rest', per.payday, per.monthEnd)));
+  out.push(sec('wf-next', `All of ${nx}`, plural(p.next.filter(l => !l.skipped).length, 'bill'), p.nextTotal, billItems(p.next, 'next', per.nextStart, per.nextEnd)));
+  if (p.buffer) out.push(`<div class="wf-line"><span>&minus; Cushion</span><strong>${money(p.buffer)}</strong></div>`);
+  if (!ready) {
+    out.push(total('Leave in Halifax', p.keep, 'start'));
+    return `<div class="card"><div class="card-head"><h2>How it adds up</h2></div>${out.join('')}</div>`;
+  }
+  out.push(total('Free to share out', p.free));
+  const day = DOW_LONG[s.weekDay == null ? 1 : s.weekDay];
+  out.push(`<div class="wf-weeks"><span>${nx} has <strong>${plural(p.weeks, 'week')}</strong><small>${p.weeks === p.autoWeeks ? `${day}s: ${p.mondays.join(', ')}` : `Changed from ${p.autoWeeks}`}</small></span>
+    <span class="stepper"><button type="button" data-action="weeks" data-d="-1" aria-label="One week fewer">&minus;</button><button type="button" data-action="weeks" data-d="1" aria-label="One week more">+</button></span></div>`);
+  out.push(sec('wf-shop', 'Shop pot', `for ${nx}`, p.shop, potItems(p, p.pots.shop, 'shop')));
+  out.push(sec('wf-spend', 'Spend pot', `for ${nx}`, p.spend, potItems(p, p.pots.spend, 'spend')));
+  const tTitle = p.transfers.length === 1 && !p.transfers[0].extra ? esc(p.transfers[0].name) : 'Payday transfers';
+  out.push(sec('wf-transfers', tTitle, '', p.transfersTotal, transferItems(p)));
+  if (p.fromSavings) out.push(`<div class="wf-line"><span>+ From your savings pot</span><span><strong>${money(p.fromSavings)}</strong> <button class="mini" data-action="undo-fromsavings">Undo</button></span></div>`);
+  if (p.leftover >= 0) {
+    const open = p.debts.filter(d => d.base > 0);
+    const m = state.months[per.id] || {};
+    const pricey = open.filter(d => d.apr > 0).sort((a, b) => b.apr - a.apr)[0];
+    const showExtra = view.open.extra || p.extra > 0;
+    out.push(`<div class="big-result r-good"><div class="label">Into your ${esc(s.savingsLabel)}</div><div class="amount">${money(p.toSavings)}</div>
+      ${p.extra ? `<div class="note">Plus ${money(p.extra)} off ${esc(debtName(p.extraDebt))}.</div>` : ''}</div>`);
+    if (pricey) out.push(`<p class="hint">${esc(pricey.name)} charges ${pricey.apr}% interest. Paying that off saves more than savings earn.</p>`);
+    if (open.length && p.leftover > 0) {
+      out.push(showExtra ? `<div class="grid2" style="margin-top:12px">
+        <div class="field"><label for="extraDebt">Pay some off</label>
+          <select id="extraDebt" data-extra="debtId">${open.map(d => `<option value="${esc(d.id)}" ${d.id === (m.extra && m.extra.debtId) ? 'selected' : ''}>${esc(d.name)} (${money(d.base)})</option>`).join('')}</select></div>
+        <div class="field"><label for="extraAmt">Amount</label>
+          <div class="money-input"><span>&pound;</span><input id="extraAmt" inputmode="decimal" autocomplete="off" enterkeyhint="done" data-extra="amount" value="${p.extra ? toPounds(p.extra) : ''}" placeholder="0.00"></div></div>
+      </div>` : '<button class="link" data-action="show-extra">Put some towards a debt instead</button>');
+    }
+  } else {
+    out.push(`<div class="big-result r-bad"><div class="label">Short for ${nx}</div><div class="amount">${money(-p.leftover)}</div><div class="note">The fixes are in Your payday moves.</div></div>`);
+  }
+  const notes = [`This pay keeps the rest of ${mn} covered and pays for all of ${nx}, so you stay a month ahead.`];
+  const raw = Engine.clampDay(per.id, s.payDay);
+  if (per.payday !== raw) notes.push(`Payday is ${fmtDate(per.payday)} because ${(state.months[per.id] || {}).paydayOverride ? 'you changed it' : `the ${ordinal(Engine.toDate(raw).getDate())} is a ${DOW_LONG[Engine.toDate(raw).getDay()]}`}.`);
+  const paused = state.bills.filter(b => b.active === false).map(b => b.name);
+  if (paused.length) notes.push(`Paused, so not counted: ${esc(listJoin(paused))}.`);
+  notes.push('Changes made here only affect that one month. Every sum uses whole pence.');
+  return `<div class="card">
+    <div class="card-head"><h2>How it adds up</h2>${p.balanced ? '<span class="badge">&#10003; Adds up</span>' : '<span class="badge bad">Check the figures</span>'}</div>
+    <p class="hint" style="margin-top:0">Tap a line to see what's in it, or to change something just for this month.</p>
+    ${out.join('')}
+    <ul class="notes">${notes.map(n => `<li>${n}</li>`).join('')}</ul>
+  </div>`;
+}
+
+function whatIfHtml(p, v) {
+  if (!(v > 0)) return '';
+  const sav = p.savingsAfter - v;
+  const after = p.net - v;
+  if (sav < 0) return `<div class="status bad">Your savings pot will have ${money(p.savingsAfter)}, so that's ${money(-sav)} more than you have.</div>`;
+  if (after >= 0) return `<div class="status ok"><strong>Yes.</strong> Your savings would drop to ${money(sav)} and you'd still be ${money(after)} in the black.</div>`;
+  return `<div class="status note">You can pay it from savings (leaving ${money(sav)}), but you'd be ${money(-after)} in the red overall.</div>`;
 }
 
 function standHtml(p) {
   const black = p.net >= 0;
+  const ticks = (state.months[p.period.id] || {}).ticks || {};
   const rows = p.debts.filter(d => d.now > 0).map(d => lineHtml(d.name, d.now, d.nextMonth ? `${money(d.nextMonth)} going off in ${monthName(p.period.nextId)}` : '')).join('');
   return `<div class="card">
-    ${stepHead(7, 'Where you stand')}
-    ${lineHtml(state.settings.savingsLabel, p.savingsAfter, p.toSavings && !((state.months[p.period.id] || {}).ticks || {})['x:savings'] ? `Includes this month's ${money(p.toSavings)}` : '')}
+    <h2>Where you stand</h2>
+    ${lineHtml(state.settings.savingsLabel, p.savingsAfter, p.toSavings && !ticks['x:savings'] ? `Includes this month's ${money(p.toSavings)}` : '')}
     ${rows || '<p class="empty">No debts recorded.</p>'}
     ${lineHtml('Total debts', p.debtAfter, '', 'total')}
     <div class="big-result ${black ? 'r-good' : 'r-bad'}">
@@ -1140,34 +1298,12 @@ function standHtml(p) {
       <div class="amount">${money(Math.abs(p.net))}</div>
       <div class="note">${black ? 'Your savings are more than everything you owe. This is money to play with.' : 'You owe more than you have saved. Every month you save brings this closer to zero.'}</div>
     </div>
-    ${p.debtNextMonth ? `<p class="hint">Paying ${money(p.debtNextMonth)} off your debts in ${monthName(p.period.nextId)}.</p>` : ''}
-  </div>`;
-}
-
-function checklistHtml(p) {
-  const s = state.settings;
-  const m = state.months[p.period.id] || {};
-  const ticks = m.ticks || {};
-  const steps = [];
-  const send = p.monzo + p.toSavings;
-  if (send > 0) {
-    steps.push({ key: 'm:send', title: `Send ${money(send)} from Halifax to Monzo`, amount: send });
-    if (p.shop) steps.push({ key: 'p:shop', title: 'Shop pot', amount: p.shop, indent: true });
-    if (p.spend) steps.push({ key: 'p:spend', title: 'Spend pot', amount: p.spend, indent: true });
-    if (p.toSavings) steps.push({ key: 'x:savings', title: s.savingsLabel, amount: p.toSavings, indent: true, sub: 'Ticking this adds it to your savings figure.' });
-  }
-  for (const t of p.transfers) steps.push({ key: t.key, title: t.name, amount: t.amount });
-  if (p.extra) steps.push({ key: 'x:debt', title: `Extra off ${debtName(p.extraDebt)}`, amount: p.extra, debtId: p.extraDebt, sub: 'Ticking this takes it off the balance.' });
-  if (p.reimbTotal && m.reimbLanded === false) steps.push({ key: 'r:later', title: `When work pays back ${money(p.reimbTotal)}, move it to your ${s.savingsLabel}`, amount: p.reimbTotal });
-  steps.push({ key: 'h:check', title: `Check Halifax shows ${money(p.keep)}`, sub: `That covers every bill until ${fmtShort(p.period.nextEnd)}.` });
-  const done = steps.filter(x => ticks[x.key]).length;
-  return `<div class="card">
-    <div class="card-head"><h2>Payday checklist</h2><span class="progress-text">${done} of ${steps.length} done</span></div>
-    ${steps.map(x => `<label class="check-item ${ticks[x.key] ? 'done' : ''} ${x.indent ? 'indent' : ''}">
-      <input type="checkbox" data-tick="${esc(x.key)}" data-amount="${x.amount || 0}" data-debt="${esc(x.debtId || '')}" ${ticks[x.key] ? 'checked' : ''}>
-      <span class="check-text"><strong>${esc(x.title)}</strong>${x.sub ? `<small>${esc(x.sub)}</small>` : ''}</span>
-      ${x.amount ? `<span class="check-amt">${money(x.amount)}</span>` : ''}
-    </label>`).join('')}
+    <div class="field" style="margin:14px 0 0">
+      <label for="whatIf">Can I afford it?</label>
+      <div class="money-input"><span>&pound;</span><input id="whatIf" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="e.g. a holiday" data-whatif value="${view.whatIf ? toPounds(view.whatIf) : ''}"></div>
+    </div>
+    <div id="whatIfResult">${whatIfHtml(p, view.whatIf)}</div>
+    <button class="link" data-action="goto" data-tab="debts">Update savings or debts</button>
   </div>`;
 }
 
@@ -1182,13 +1318,13 @@ function hcResultHtml(tc, actual) {
 
 function todayCheckHtml(p) {
   const tc = p.todayCheck;
-  if (!tc || today() === p.period.payday) return ''; // on payday itself the checklist covers this
+  if (!tc || today() === p.period.payday) return ''; // on payday itself the moves cover this
   const m = state.months[p.period.id] || {};
   const fresh = m.check && m.check.at === today();
   return `<div class="card">
     <h2>Halifax check for today</h2>
     <p>Halifax should have at least <strong>${money(tc.required)}</strong> in it today.</p>
-    <p class="hint">${plural(tc.count, 'bill')} still to come up to ${fmtShort(p.period.nextEnd)}${p.buffer ? ', plus your buffer' : ''}.</p>
+    <p class="hint">${plural(tc.count, 'bill')} still to come up to ${fmtShort(p.period.nextEnd)}${p.buffer ? ', plus your cushion' : ''}.</p>
     <div class="field" style="margin-top:12px">
       <label for="hcActual">What does the Halifax app show?</label>
       <div class="money-input"><span>&pound;</span><input id="hcActual" inputmode="decimal" autocomplete="off" enterkeyhint="done" data-hc value="${fresh ? toPounds(m.check.amount) : ''}" placeholder="0.00"></div>
@@ -1206,45 +1342,10 @@ function timelineHtml(p) {
       <thead><tr><th>Date</th><th>Bill</th><th class="amt">Amount</th><th class="amt">After</th></tr></thead>
       <tbody>
         <tr class="minor"><td class="nowrap">${fmtDate(p.period.payday)}</td><td>After payday moves</td><td></td><td class="amt">${money(p.keep)}</td></tr>
-        ${p.timeline.map((l, i) => `<tr class="${l.date < t ? 'past' : ''} ${i === p.rest.length && i > 0 ? 'split' : ''}"><td class="nowrap">${fmtDate(l.date)}</td><td>${esc(l.name)}</td><td class="amt">${money(l.amount)}</td><td class="amt">${money(l.after)}</td></tr>`).join('')}
+        ${p.timeline.map(l => `<tr class="${l.date < t ? 'past' : ''}"><td class="nowrap">${fmtDate(l.date)}</td><td>${esc(l.name)}</td><td class="amt">${money(l.amount)}</td><td class="amt">${money(l.after)}</td></tr>`).join('')}
         <tr class="total"><td colspan="3">Left on ${fmtShort(p.period.nextEnd)}</td><td class="amt">${money(p.buffer)}</td></tr>
       </tbody>
     </table></div>
-  </details>`;
-}
-
-function workingHtml(p, hasPay) {
-  const s = state.settings;
-  const per = p.period;
-  const row = (label, amount, sign, cls) => `<tr class="${cls || ''}"><td>${label}</td><td class="amt">${sign || ''}${money(amount)}</td></tr>`;
-  const notes = [];
-  notes.push(`This pay keeps the rest of ${monthName(per.id)} covered and pays for all of ${monthName(per.nextId)}, so you stay a month ahead.`);
-  const raw = Engine.clampDay(per.id, s.payDay);
-  if (per.payday !== raw) notes.push(`Payday is ${fmtDate(per.payday)} because ${(state.months[per.id] || {}).paydayOverride ? 'you changed it' : `the ${ordinal(Engine.toDate(raw).getDate())} is a ${DOW_LONG[Engine.toDate(raw).getDay()]}`}.`);
-  notes.push(`${monthName(per.nextId)} counts as ${plural(p.weeks, 'week')} for weekly budgets${p.weeks === p.autoWeeks ? ` (one for each ${DOW_LONG[s.weekDay == null ? 1 : s.weekDay]})` : ', as you set it'}.`);
-  const paused = state.bills.filter(b => b.active === false).map(b => b.name);
-  if (paused.length) notes.push(`Paused, so not counted: ${esc(listJoin(paused))}.`);
-  if (!p.entered) notes.push(`No Halifax balance entered, so the plan assumes Halifax held exactly ${money(p.restTotal + p.buffer)} before your pay.`);
-  notes.push('Every sum uses whole pence, so there are no rounding errors.');
-  const check = hasPay && p.leftover >= 0
-    ? (p.balanced
-      ? `<p class="status ok">&#10003; ${money(p.halifax)} = ${money(p.keep)} Halifax + ${money(p.monzo)} Monzo + ${money(p.transfersTotal)} transfers + ${money(p.extra + p.toSavings)} left over</p>`
-      : '<p class="status bad">These figures do not add up. Please report this.</p>')
-    : '';
-  return `<details class="card" id="working" ${view.open.working ? 'open' : ''}>
-    <summary>Show the working</summary>
-    <div class="table-wrap"><table><tbody>
-      ${p.entered ? row('Halifax balance now', p.halifax) : row(`Pay ${money(p.pay)} plus ${money(p.restTotal + p.buffer)} kept back`, p.halifax)}
-      ${row(`Rest of ${monthName(per.id)} (${p.rest.length})`, p.restTotal, '&minus; ')}
-      ${row(`All of ${monthName(per.nextId)} (${p.next.length})`, p.nextTotal, '&minus; ')}
-      ${p.buffer ? row('Buffer', p.buffer, '&minus; ') : ''}
-      ${row('Free to share out', p.free, '', 'total')}
-      ${hasPay ? row('Shop pot', p.shop, '&minus; ') + row('Spend pot', p.spend, '&minus; ') + row('Transfers', p.transfersTotal, '&minus; ') + row(p.leftover < 0 ? 'Short by' : 'Left over', Math.abs(p.leftover), '', 'total') : ''}
-      ${hasPay && p.extra ? row('&nbsp;&nbsp;off ' + esc(debtName(p.extraDebt)), p.extra, '', 'minor') : ''}
-      ${hasPay && p.leftover > 0 ? row('&nbsp;&nbsp;to ' + esc(s.savingsLabel), p.toSavings, '', 'minor') : ''}
-    </tbody></table></div>
-    ${check}
-    <ul class="notes">${notes.map(n => `<li>${n}</li>`).join('')}</ul>
   </details>`;
 }
 
@@ -1258,7 +1359,9 @@ function snapshot(p) {
 function renderMoney() {
   const el = $('#tab-money');
   const live = x => x.active !== false;
-  const bills = [...state.bills].sort((a, b) => (a.once || '') .localeCompare(b.once || '') || a.day - b.day || a.name.localeCompare(b.name));
+  const bills = state.bills.filter(b => !b.once).sort((a, b) => a.day - b.day || a.name.localeCompare(b.name));
+  const thisMonth = today().slice(0, 7);
+  const oneOffs = state.bills.filter(b => b.once && b.once >= thisMonth).sort((a, b) => a.once.localeCompare(b.once) || a.day - b.day);
   const billTotal = state.bills.filter(b => live(b) && !b.once).reduce((t, b) => t + (b.amount || 0), 0);
   const budgetRow = b => entryRow('budget', b, `${b.per === 'week' ? 'A week' : 'A month'}${b.active === false ? ' &middot; Paused' : ''}`);
   el.innerHTML = `
@@ -1268,6 +1371,11 @@ function renderMoney() {
       ${bills.map(b => entryRow('bill', b, billMeta(b))).join('') || '<p class="empty">No bills yet. Add each direct debit and standing order.</p>'}
       ${lineHtml('Each month', billTotal, '', 'total')}
     </div>
+    ${oneOffs.length ? `<div class="card">
+      <h2>Coming up: one-off bills</h2>
+      <p class="hint" style="margin-top:0">Added for a single month. Add more from the Payday screen.</p>
+      ${oneOffs.map(b => entryRow('bill', b, billMeta(b))).join('')}
+    </div>` : ''}
     <div class="card">
       <div class="card-head"><h2>Monzo pots</h2><button class="btn btn-sm" data-action="add" data-kind="budget">Add</button></div>
       <p class="hint" style="margin-top:0">Weekly amounts are multiplied by the weeks in the month.</p>
@@ -1320,9 +1428,12 @@ function renderDebts() {
     </div>
     <div class="card">
       <h2>${esc(state.settings.savingsLabel)}</h2>
-      <div class="inline-row">
-        <div class="money-input"><span>&pound;</span><input id="savBal" inputmode="decimal" autocomplete="off" enterkeyhint="done" value="${toPounds(sav)}" aria-label="Savings balance"></div>
-        <button class="btn" data-action="save-savings">Update</button>
+      <div class="big-num">${money(sav)}</div>
+      <div class="money-input" style="margin-top:8px"><span>&pound;</span><input id="savAmt" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="Amount" aria-label="Amount"></div>
+      <div class="ops">
+        <button class="btn btn-sm" data-action="sav" data-op="in">Put in</button>
+        <button class="btn btn-ghost btn-sm" data-action="sav" data-op="out">Took out</button>
+        <button class="btn btn-ghost btn-sm" data-action="sav" data-op="set">Set balance</button>
       </div>
       <p class="hint">${state.savings.updated ? 'Last updated ' + fmtDate(state.savings.updated, true) + '. ' : ''}Ticking the savings step on payday adds to this for you.</p>
     </div>
@@ -1351,9 +1462,11 @@ function debtCardHtml(d) {
     <div class="card-head"><h2>${esc(d.name)}</h2><span class="tag">${d.apr ? esc(d.apr) + '% interest' : 'No interest'}</span></div>
     <div class="big-num">${money(d.now)}</div>
     <p class="hint" style="margin-top:0">${d.balance !== d.now ? `You entered ${money(d.balance)} on ${fmtDate(d.updated)}. ${money(d.balance - d.now)} paid since.` : `Updated ${fmtDate(d.updated, true)}.`}</p>
-    <div class="inline-row" style="margin-top:10px">
-      <div class="money-input"><span>&pound;</span><input id="bal-${esc(d.id)}" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="New balance" aria-label="New balance for ${esc(d.name)}"></div>
-      <button class="btn" data-action="update-debt" data-id="${esc(d.id)}">Update</button>
+    <div class="money-input" style="margin-top:10px"><span>&pound;</span><input id="amt-${esc(d.id)}" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="Amount" aria-label="Amount for ${esc(d.name)}"></div>
+    <div class="ops">
+      <button class="btn btn-sm" data-action="debt-op" data-op="paid" data-id="${esc(d.id)}">I paid this off</button>
+      <button class="btn btn-ghost btn-sm" data-action="debt-op" data-op="more" data-id="${esc(d.id)}">I owe more</button>
+      <button class="btn btn-ghost btn-sm" data-action="debt-op" data-op="set" data-id="${esc(d.id)}">Set balance</button>
     </div>
     ${lineHtml('Monthly repayment', d.monthly, linked.length ? linked.map(b => `${b.name} on the ${ordinal(b.day)}`).join(', ') : 'Link a Halifax bill to track it')}
     <div class="line"><span>Cleared</span><strong style="white-space:normal;text-align:right">${when}</strong></div>
@@ -1450,6 +1563,11 @@ function renderSettings() {
         <div class="money-input"><span>&pound;</span><input id="setBuffer" inputmode="decimal" autocomplete="off" data-setting="buffer" data-type="money" value="${toPounds(s.buffer)}"></div></div>
     </div>
     <div class="field"><label for="setSavLabel">Savings pot name</label><input type="text" id="setSavLabel" maxlength="40" data-setting="savingsLabel" value="${esc(s.savingsLabel)}"></div>
+  </div>
+  <div class="card">
+    <h2>Payday reminder</h2>
+    <p class="hint" style="margin-top:0">Adds a monthly reminder to your calendar on payday (the Friday before when it falls at a weekend), with a link straight here.</p>
+    <div class="actions"><button class="btn btn-ghost btn-sm" data-action="calendar">Add to my calendar</button></div>
   </div>
   <div class="card">
     <h2>History</h2>
@@ -1582,13 +1700,57 @@ function importBackup(file) {
   reader.readAsText(file);
 }
 
+// Saves a change for this month only. Keys: 'b:billId:date', 'p:budgetId', 't:transferId'. null resets.
+function setAdjust(key, amount, skip) {
+  const [kind, id, date] = key.split(':');
+  const m = month();
+  if (kind === 'b') {
+    const k = `${id}:${date}`;
+    if (amount == null) delete state.adjust[k];
+    else state.adjust[k] = skip ? { skip: true } : { amount };
+  } else if (kind === 'p') {
+    m.pots = m.pots || {};
+    if (amount == null) delete m.pots[id]; else m.pots[id] = amount;
+  } else if (kind === 't') {
+    m.transferAmounts = m.transferAmounts || {};
+    if (amount == null) delete m.transferAmounts[id]; else m.transferAmounts[id] = amount;
+  }
+  view.adj = null;
+  save();
+  renderPlan();
+  toast(amount == null ? 'Back to usual' : skip ? 'Skipped this time' : 'Changed for this month');
+}
+
+// A repeating calendar event on payday, moved to the Friday before at weekends
+function downloadReminder() {
+  const s = state.settings;
+  const d = Math.min(28, Math.max(3, s.payDay));
+  const rule = s.weekendRule === 'before'
+    ? `RRULE:FREQ=MONTHLY;BYMONTHDAY=${d - 2},${d - 1},${d};BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-1`
+    : `RRULE:FREQ=MONTHLY;BYMONTHDAY=${s.payDay}`;
+  const next = Engine.period(Engine.monthIdFor(today(), state), state).nextPayday.replace(/-/g, '');
+  const url = location.origin + location.pathname;
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Finance Manager//EN', 'BEGIN:VEVENT',
+    `UID:payday-${uid()}@finance-manager`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').slice(0, 15)}Z`,
+    `DTSTART:${next}T080000`, 'DURATION:PT15M', rule,
+    'SUMMARY:Payday: plan your money (10 minutes)', `DESCRIPTION:Open Finance Manager: ${url}`, `URL:${url}`,
+    'BEGIN:VALARM', 'TRIGGER:PT0M', 'ACTION:DISPLAY', 'DESCRIPTION:Payday planner', 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
+  a.download = 'payday-reminder.ics';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  toast('Open the downloaded file to add it to your calendar');
+}
+
 // ---------- Events ----------
 const actions = {
   'prev-month': () => { view.monthId = Engine.shiftMonth(view.monthId, -1); renderPayday(); },
   'next-month': () => { view.monthId = Engine.shiftMonth(view.monthId, 1); if (view.tab !== 'payday') setTab('payday'); else renderPayday(); window.scrollTo(0, 0); },
   'this-month': () => { view.monthId = Engine.monthIdFor(today(), state); renderPayday(); },
   'goto': b => setTab(b.dataset.tab),
-  'same-pay': () => { month().pay = state.months[Engine.shiftMonth(view.monthId, -1)].pay; save(); renderPayday(); },
   'reset-payday': () => { delete month().paydayOverride; save(); renderPayday(); },
   'reimb': b => { month().reimbLanded = b.dataset.v === '1'; save(); renderPayday(); },
   'weeks': b => {
@@ -1608,11 +1770,13 @@ const actions = {
     state[k] = state[k].filter(x => x.id !== editing.id);
     save(); dlg.close(); renderTab(); toast('Deleted');
   },
-  'save-savings': () => {
-    const v = toP($('#savBal').value);
-    if (v == null || v < 0) { toast('Enter your savings balance.'); return; }
-    state.savings = { balance: v, updated: today() };
-    save(); renderDebts(); toast('Savings updated');
+  'sav': b => {
+    const v = toP($('#savAmt').value);
+    if (v == null || v < 0) { toast('Type an amount first.'); return; }
+    const cur = state.savings.balance || 0;
+    const nb = b.dataset.op === 'in' ? cur + v : b.dataset.op === 'out' ? Math.max(0, cur - v) : v;
+    state.savings = { balance: nb, updated: today() };
+    save(); renderDebts(); toast(`Savings now ${money(nb)}`);
   },
   'add-debt': () => {
     const name = $('#ndName').value.trim();
@@ -1622,13 +1786,65 @@ const actions = {
     state.debts.push({ id: uid(), name, balance: bal, startBalance: bal, apr: Math.max(0, apr), updated: today(), updatedTs: Date.now() });
     save(); renderDebts(); toast('Debt added');
   },
-  'update-debt': b => {
+  'debt-op': b => {
     const d = state.debts.find(x => x.id === b.dataset.id);
-    const v = toP($('#bal-' + CSS.escape(b.dataset.id)).value);
-    if (!d || v == null || v < 0) { toast('Type the new balance first.'); return; }
-    d.balance = v; d.updated = today(); d.updatedTs = Date.now();
-    save(); renderDebts(); toast(`${d.name} updated`);
+    const v = toP($('#amt-' + CSS.escape(b.dataset.id)).value);
+    if (!d || v == null || v < 0) { toast('Type an amount first.'); return; }
+    const cur = Engine.debtBalance(d, state, today());
+    const nb = Math.max(0, b.dataset.op === 'paid' ? cur - v : b.dataset.op === 'more' ? cur + v : v);
+    d.balance = nb; d.updated = today(); d.updatedTs = Date.now();
+    if (nb > (d.startBalance || 0)) d.startBalance = nb;
+    save(); renderDebts(); toast(`${d.name} now ${money(nb)}`);
   },
+  // Payday screen: change, skip or add something just for this month
+  'adj-open': b => { view.adj = view.adj === b.dataset.key ? null : b.dataset.key; view.add = null; renderPlan(); const i = $('#adjAmt'); if (i) i.focus(); },
+  'adj-close': () => { view.adj = null; renderPlan(); },
+  'adj-save': b => { const v = toP($('#adjAmt').value); if (v == null || v < 0) { toast('Type an amount.'); return; } setAdjust(b.dataset.key, v); },
+  'adj-skip': b => setAdjust(b.dataset.key, 0, true),
+  'adj-reset': b => setAdjust(b.dataset.key, null),
+  'add-open': b => { view.add = b.dataset.form; view.adj = null; renderPlan(); const i = $('#addName'); if (i) i.focus(); },
+  'add-close': () => { view.add = null; renderPlan(); },
+  'add-save': b => {
+    const name = $('#addName').value.trim();
+    const amount = toP($('#addAmt').value);
+    if (!name || !(amount > 0)) { toast('Give it a name and an amount.'); return; }
+    const m = month();
+    const kind = b.dataset.kind;
+    if (kind === 'bill') {
+      const date = $('#addDate').value;
+      const el = $('#addDate');
+      if (!date || date < el.min || date > el.max) { toast(`Pick a date between ${fmtShort(el.min)} and ${fmtShort(el.max)}.`); return; }
+      state.bills.push({ id: uid(), name, amount, day: Number(date.slice(8)), once: date.slice(0, 7), debtId: null, reimbursed: false, active: true });
+    } else if (kind === 'pot') {
+      (m.potExtras = m.potExtras || []).push({ id: uid(), name, amount, pot: b.dataset.pot });
+    } else {
+      (m.transferExtras = m.transferExtras || []).push({ id: uid(), name, amount, debtId: ($('#addDebt') && $('#addDebt').value) || null });
+    }
+    view.add = null;
+    view.open['wf-' + b.dataset.section] = true;
+    save(); renderPlan(); toast(`${name} added`);
+  },
+  'remove-bill': b => { state.bills = state.bills.filter(x => x.id !== b.dataset.id); save(); renderPlan(); toast('Removed'); },
+  'remove-potextra': b => { const m = month(); m.potExtras = (m.potExtras || []).filter(x => x.id !== b.dataset.id); save(); renderPlan(); toast('Removed'); },
+  'remove-transfer': b => { const m = month(); m.transferExtras = (m.transferExtras || []).filter(x => x.id !== b.dataset.id); delete m.ticks['tx:' + b.dataset.id]; save(); renderPlan(); toast('Removed'); },
+  'fix-savings': b => { const m = month(); m.fromSavings = (m.fromSavings || 0) + Number(b.dataset.v); save(); renderPlan(); toast('Savings top-up added to your moves'); },
+  'undo-fromsavings': () => { const m = month(); delete m.fromSavings; if (m.ticks['x:fromsavings']) { state.savings.balance = (state.savings.balance || 0) + m.ticks['x:fromsavings'].amount; delete m.ticks['x:fromsavings']; } save(); renderPlan(); },
+  'fix-spend': b => {
+    // Take the cut from the biggest Spend lines first, for this month only
+    let cut = Number(b.dataset.v);
+    const m = month();
+    const p = Engine.buildPlan(state, view.monthId, today());
+    m.pots = m.pots || {};
+    for (const x of [...p.pots.spend].filter(x => !x.extra).sort((a, c) => c.total - a.total)) {
+      if (cut <= 0) break;
+      const take = Math.min(cut, x.total);
+      m.pots[x.id] = x.total - take;
+      cut -= take;
+    }
+    view.open['wf-spend'] = true;
+    save(); renderPlan(); toast('Spend pot trimmed for this month');
+  },
+  'calendar': () => downloadReminder(),
   'edit-debt': b => { view.editDebt = view.editDebt === b.dataset.id ? null : b.dataset.id; renderDebts(); },
   'save-debt': b => {
     const d = state.debts.find(x => x.id === b.dataset.id);
@@ -1689,6 +1905,14 @@ const actions = {
 };
 
 document.addEventListener('click', e => {
+  const c = e.target.closest('[data-copy]');
+  if (c) {
+    const v = c.dataset.copy;
+    (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject())
+      .then(() => toast(`Copied ${v}. Paste it into your banking app.`))
+      .catch(() => prompt('Copy this amount', v));
+    return;
+  }
   const b = e.target.closest('[data-action], [role=tab]');
   if (!b) return;
   if (b.getAttribute('role') === 'tab') { setTab(b.dataset.tab); return; }
@@ -1706,9 +1930,12 @@ document.addEventListener('input', e => {
     const v = toP(el.value);
     const m = month();
     m[el.dataset.monthField] = el.dataset.monthField === 'pay' ? (v > 0 ? v : null) : v;
-    if (m.pay && $('#samePay')) $('#samePay').hidden = true;
+    if (el.dataset.monthField === 'pay') { m.payFromLast = false; if ($('#payHint')) $('#payHint').hidden = true; }
     save();
     renderPlan();
+  } else if (el.hasAttribute('data-whatif')) {
+    view.whatIf = toP(el.value);
+    $('#whatIfResult').innerHTML = whatIfHtml(Engine.buildPlan(state, view.monthId, today()), view.whatIf);
   } else if (el.hasAttribute('data-hc')) {
     const m = month();
     m.check = { amount: toP(el.value), at: today() };
@@ -1724,14 +1951,15 @@ document.addEventListener('change', e => {
     const m = month();
     const key = el.dataset.tick;
     const amount = Number(el.dataset.amount) || 0;
-    const addsToSavings = key === 'x:savings' || key === 'r:later';
+    // Savings ticks move the savings figure: in for savings and work pay-backs, out for a top-up
+    const sign = key === 'x:savings' || key === 'r:later' ? 1 : key === 'x:fromsavings' ? -1 : 0;
     if (el.checked) {
       m.ticks[key] = { ts: Date.now(), at: today(), amount, debtId: el.dataset.debt || null };
-      if (addsToSavings) state.savings = { balance: (state.savings.balance || 0) + amount, updated: today() };
+      if (sign) state.savings = { balance: Math.max(0, (state.savings.balance || 0) + sign * amount), updated: today() };
     } else {
       const was = m.ticks[key];
       delete m.ticks[key];
-      if (addsToSavings && was) state.savings = { balance: Math.max(0, (state.savings.balance || 0) - (was.amount || 0)), updated: today() };
+      if (sign && was) state.savings = { balance: Math.max(0, (state.savings.balance || 0) - sign * (was.amount || 0)), updated: today() };
     }
     save();
     renderPlan();
