@@ -1,44 +1,42 @@
 # Finance Manager
 
-A personal payday planner. Enter what you were paid and it tells you:
+A personal payday planner that keeps you a month ahead. Enter what you were paid and your Halifax balance, and it walks you through:
 
-1. **Keep in Halifax**: every direct debit and standing order until the next payday, plus a small buffer.
-2. **Monzo pots**: Shopping (food, petrol, haircuts), Spend (your spending money) and Bills (Monzo direct debits).
-3. **Payday transfers**: daughter's saver, paying back a friend, anything you move yourself.
-4. **Left over**: what's free, with a suggested split between savings and extra debt payments.
+1. **What came in:** pay, plus any work pay-backs (internet, phone).
+2. **Rest of this month:** every Halifax bill from payday to the end of the month.
+3. **All of next month:** every Halifax bill next month. Together with step 2, that's what to **leave in Halifax**.
+4. **Monzo for next month:** weekly budgets (food, petrol, spending) times the Mondays in the month, plus monthly ones (haircuts).
+5. **Payday transfers:** your daughter's savings and anything else.
+6. **Left over:** into the savings pot, or some towards a debt.
+7. **Where you stand:** savings against everything owed. In the black or in the red.
 
-It then gives you a tick list for payday and shows the full working so you can check every figure.
+Then a tick list for payday, a Halifax check for any day of the month, and the full working.
 
 ## How the maths works
 
-* A pay period runs from payday (the 15th, or the Friday before if that's a weekend) to the day before the next payday.
-* Every monthly payment dated inside that window is counted **once**. The old version counted bills dated after payday twice, which understated what was left over each month.
-* Bills on the 29th to 31st fall on the last day of shorter months.
-* All sums are done in whole pence, so totals never drift.
-* "Show the working" on the Payday screen lists every line and confirms that what came in equals what was planned.
+* Each pay keeps the rest of the current month covered and pays for every bill next month.
+* Leave in Halifax = rest of this month + all of next month (+ an optional cushion).
+* Free to share out = Halifax balance minus that. With no balance entered, it assumes last month kept back exactly enough.
+* Bills on the 29th to 31st fall on the last day of shorter months. Weekend paydays move to the Friday before.
+* All sums are done in whole pence. "Show the working" confirms every pound is accounted for.
 
-## Using it
+## Your figures and privacy
 
-Open `finance-manager.html` in any browser. On iPhone, add it to the Home Screen for an app icon.
-
-Your figures are stored **only in the browser you use**. Nothing is sent anywhere. That also means:
-
-* Download a backup from Settings now and then (the app reminds you after 30 days).
-* A different web address, a different browser, or the iPhone Home Screen icon versus Safari each keep separate data. Use a backup to move between them.
-
-### Moving from the old version
-
-If the new file replaces the old one **at the same web address**, it picks up your existing payments, debts and savings automatically on first open. The old data is left untouched.
+* This app holds **no figures**. Anyone opening the link sees an empty planner.
+* Your figures save to a **private** GitHub repository you create (`finance-data`), using a key that only opens that one repository. Each device needs the key once.
+* Every save is kept as a version in that repository, so you can see what changed and when.
+* The page only talks to GitHub (a security rule in the page blocks everything else) and asks search engines not to list it.
+* To cut off a device, delete the key on GitHub and make a new one.
 
 ## Checking the maths
 
-`tests/engine.test.js` runs 23 checks against the calculation code taken straight from `finance-manager.html`, including two years of pay periods to prove no bill is missed or counted twice.
+`tests/engine.test.js` runs 26 checks against the calculation code taken straight from `finance-manager.html`, including a two-year simulation proving Halifax never runs short and arrives at each payday holding exactly the rest of that month.
 
 ```
 node tests/engine.test.js
 ```
 
-GitHub runs these checks automatically on every change.
+GitHub runs these checks on every change.
 
 ## Files
 
