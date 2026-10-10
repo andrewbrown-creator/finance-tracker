@@ -330,6 +330,50 @@ test('money spent after the balance was taken is left out of that plan but shows
   assert.strictEqual(p.todayCheck.owed, 9000);
 });
 
+// ---- Progress over time ----
+const progressState = () => makeState({
+  bills: [bill('Rent', 100000, 1), bill('Card', 10000, 8, { debtId: 'cc' })],
+  budgets: [weekly('Food', 7000)],
+  savings: { balance: 50000 },
+  debts: [{ id: 'cc', name: 'Card', balance: 30000, apr: 0, updated: '2026-10-15', updatedTs: 1 }],
+  months: { '2026-10': { pay: 200000 } }
+});
+test('progress: savings grow by each payday\'s leftover, including 4 and 5 week months', () => {
+  const s = progressState();
+  const pr = Engine.progress(s, '2026-10-15', 6);
+  assert.strictEqual(pr.points[0].kind, 'now');
+  assert.strictEqual(pr.points[0].savings, 50000 + 55000);           // Oct pay funds a 5-week November
+  assert.strictEqual(pr.points[1].savings - pr.points[0].savings, 62000); // Nov pay funds a 4-week December
+  assert.strictEqual(pr.points.length, 7);
+});
+test('progress: debts fall by their repayments and the debt-free month is found', () => {
+  const pr = Engine.progress(progressState(), '2026-10-15', 6);
+  assert.deepStrictEqual(pr.points.slice(0, 4).map(p => p.debt), [30000, 20000, 10000, 0]);
+  assert.strictEqual(pr.debtFreeId, '2027-01');
+  // Same answer when the clearing month is beyond the chart
+  assert.strictEqual(Engine.progress(progressState(), '2026-10-15', 1).debtFreeId, '2027-01');
+});
+test('progress: a debt with no regular repayment is flagged instead of given a date', () => {
+  const s = progressState();
+  s.debts.push({ id: 'f', name: 'Friend', balance: 20000, apr: 0, updated: '2026-10-15', updatedTs: 1 });
+  const pr = Engine.progress(s, '2026-10-15', 6);
+  assert.deepStrictEqual(pr.unpaid, ['Friend']);
+  assert.strictEqual(pr.debtFreeId, null);
+});
+test('progress: interest is added before repayments', () => {
+  const s = progressState();
+  s.debts[0].apr = 24; // 2% a month
+  const pr = Engine.progress(s, '2026-10-15', 2);
+  assert.strictEqual(pr.points[1].debt, 30000 + 600 - 10000);
+});
+test('progress: history comes from past paydays', () => {
+  const s = progressState();
+  s.months['2026-09'] = { pay: 200000, snapshot: { savings: 40000, debt: 35000 } };
+  const pr = Engine.progress(s, '2026-10-15', 3);
+  assert.deepStrictEqual(pr.points[0], { id: '2026-09', savings: 40000, debt: 35000, kind: 'past' });
+  assert.strictEqual(pr.points[1].kind, 'now');
+});
+
 // ---- Mid-month check ----
 test('the Halifax check covers everything still to come up to the end of next month', () => {
   const s = makeState({ settings: { buffer: 5000 }, bills: [bill('A', 1000, 20), bill('B', 2000, 2)] });

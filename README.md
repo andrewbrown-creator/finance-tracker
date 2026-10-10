@@ -21,6 +21,8 @@ A personal payday planner that keeps you a month ahead. Enter what you were paid
 
 On a laptop the Payday screen shows a summary strip and two columns; on a phone it's a single column.
 
+**Your progress** (Debts tab): a chart of savings against debts, with your past paydays as a solid line and the next 12 months projected as a dashed line. Above it: in the black or red now, when you'll be debt-free, and savings in a year. Hover or use the arrow keys to read any month, or switch to a table.
+
 Also: **Can I afford it?** for any amount, quick *I paid / I owe more* buttons for debts, *Put in / Took out* for savings, a Halifax check for any day of the month, and a payday reminder for your calendar.
 
 ## How the maths works
@@ -41,7 +43,7 @@ Also: **Can I afford it?** for any amount, quick *I paid / I owe more* buttons f
 
 ## Checking the maths
 
-`tests/engine.test.js` runs 36 checks against the calculation code taken straight from `finance-manager.html`, including a two-year simulation proving Halifax never runs short and arrives at each payday holding exactly the rest of that month.
+`tests/engine.test.js` runs 41 checks against the calculation code taken straight from `finance-manager.html`, including a two-year simulation proving Halifax never runs short and arrives at each payday holding exactly the rest of that month.
 
 ```
 node tests/engine.test.js
