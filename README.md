@@ -17,6 +17,10 @@ A personal payday planner that keeps you a month ahead. Enter what you were paid
 3. **How it adds up** shows every line. Tap a line to change or skip something for that month only, or add a one-off (a bill, extra for a pot, a payment to someone).
 4. Short month? One tap to top up from savings or trim the Spend pot.
 
+**Owed back to you:** paid for something out of Halifax that's coming back, like a work trip? Add it, and the plan counts it straight away if Halifax can still pay every bill until it lands. If not, it tells you why and reminds you to move it to savings when it arrives. Tap *It's back* when it lands.
+
+On a laptop the Payday screen shows a summary strip and two columns; on a phone it's a single column.
+
 Also: **Can I afford it?** for any amount, quick *I paid / I owe more* buttons for debts, *Put in / Took out* for savings, a Halifax check for any day of the month, and a payday reminder for your calendar.
 
 ## How the maths works
@@ -37,7 +41,7 @@ Also: **Can I afford it?** for any amount, quick *I paid / I owe more* buttons f
 
 ## Checking the maths
 
-`tests/engine.test.js` runs 31 checks against the calculation code taken straight from `finance-manager.html`, including a two-year simulation proving Halifax never runs short and arrives at each payday holding exactly the rest of that month.
+`tests/engine.test.js` runs 36 checks against the calculation code taken straight from `finance-manager.html`, including a two-year simulation proving Halifax never runs short and arrives at each payday holding exactly the rest of that month.
 
 ```
 node tests/engine.test.js

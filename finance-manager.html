@@ -65,8 +65,17 @@
 
   /* Header */
   header.top { position: sticky; top: 0; z-index: 10; background: var(--surface); border-bottom: 1px solid var(--line); padding-top: env(safe-area-inset-top); }
-  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 10px; padding-bottom: 6px; }
-  .brand { font-weight: 750; font-size: 17px; white-space: nowrap; }
+  .topbar {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "brand pill" "tabs tabs";
+    align-items: center; gap: 6px 10px; padding-top: 10px;
+  }
+  .brand { grid-area: brand; font-weight: 750; font-size: 17px; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+  .logo {
+    width: 26px; height: 26px; border-radius: 8px; display: inline-grid; place-items: center; font-size: 15px; font-weight: 800;
+    color: #fff; background: linear-gradient(135deg, var(--halifax), var(--transfer));
+  }
+  .topbar .pill { grid-area: pill; justify-self: end; }
+  .topbar .tabs { grid-area: tabs; }
   .pill {
     display: inline-flex; align-items: center; gap: 7px; font: inherit; font-size: 12.5px; font-weight: 700;
     padding: 5px 11px; border-radius: 999px; border: 0; cursor: pointer; background: var(--surface-2); color: var(--muted); white-space: nowrap;
@@ -83,6 +92,7 @@
   }
   .tabs button[aria-selected="true"] { background: var(--ink); color: var(--surface); }
   @media (max-width: 400px) { .tabs button { padding: 8px 9px; font-size: 13.5px; } }
+  @media (max-width: 370px) { .brand-text { display: none; } }
 
   main { padding-top: 16px; padding-bottom: calc(48px + env(safe-area-inset-bottom)); }
 
@@ -290,21 +300,54 @@
   .adj-editor input[type=text], .adj-editor input[type=date], .adj-editor select { background: var(--surface); }
   .adj-editor .money-input { background: var(--surface); }
   .ops { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; vertical-align: 1px; }
+  .dot.halifax { background: var(--halifax); }
+  .dot.monzo { background: var(--monzo); }
+  .dot.done { background: var(--good); }
+  .glance { display: none; }
+  .tile-label { font-size: 12px; font-weight: 750; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .tile-amount { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em; margin-top: 4px; }
+  .tile-note { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  /* Wider screens: one header row, a summary strip and two columns */
+  @media (min-width: 1024px) {
+    body { background: radial-gradient(1100px 380px at 50% -120px, var(--halifax-soft), transparent 70%), var(--bg); background-attachment: fixed; }
+    .wrap { max-width: 1200px; padding: 0 32px; }
+    header.top { background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+    .topbar { grid-template-columns: 1fr auto 1fr; grid-template-areas: "brand tabs pill"; padding-top: 12px; padding-bottom: 12px; }
+    .topbar .tabs { padding-bottom: 0; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px; }
+    .tabs button { flex: 0 0 auto; padding: 8px 18px; }
+    main { padding-top: 26px; }
+    .card { padding: 22px 24px; border-radius: 20px; }
+    .month-nav { margin: 0 auto 18px; max-width: 560px; }
+    .month-nav .title strong { font-size: 26px; }
+    .glance { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+    .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; box-shadow: var(--shadow); border-top: 4px solid var(--line); }
+    .tile.halifax { border-top-color: var(--halifax); } .tile.halifax .tile-amount { color: var(--halifax); }
+    .tile.monzo { border-top-color: var(--monzo); } .tile.monzo .tile-amount { color: var(--monzo); }
+    .tile.good { border-top-color: var(--good); } .tile.good .tile-amount { color: var(--good); }
+    .tile.bad { border-top-color: var(--bad); } .tile.bad .tile-amount { color: var(--bad); }
+    .pay-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 22px; align-items: start; }
+    .cols { column-count: 2; column-gap: 22px; }
+    .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+    .cols > .card { break-inside: avoid; display: inline-block; width: 100%; }
+    .notice { max-width: none; }
+  }
   footer.foot { color: var(--muted); font-size: 12.5px; text-align: center; padding: 8px 0 0; }
 </style>
 </head>
 <body>
 <header class="top">
   <div class="wrap topbar">
-    <div class="brand">Finance Manager</div>
+    <div class="brand"><span class="logo" aria-hidden="true">&pound;</span><span class="brand-text">Finance Manager</span></div>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button role="tab" data-tab="payday">Payday</button>
+      <button role="tab" data-tab="money">Bills</button>
+      <button role="tab" data-tab="debts">Debts</button>
+      <button role="tab" data-tab="settings">Settings</button>
+    </nav>
     <button class="pill" id="syncPill" data-action="goto" data-tab="settings" title="Where your figures are saved"></button>
   </div>
-  <nav class="wrap tabs" role="tablist" aria-label="Sections">
-    <button role="tab" data-tab="payday">Payday</button>
-    <button role="tab" data-tab="money">Bills</button>
-    <button role="tab" data-tab="debts">Debts</button>
-    <button role="tab" data-tab="settings">Settings</button>
-  </nav>
 </header>
 
 <main class="wrap">
@@ -489,6 +532,12 @@ const Engine = (() => {
     return out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.name.localeCompare(b.name)));
   }
 
+  // Money paid out of Halifax that is coming back (work expenses, someone paying you back),
+  // still outstanding on a given date.
+  function owedAt(state, date) {
+    return (state.owed || []).filter(o => o.amount > 0 && o.spent <= date && (!o.back || o.back > date));
+  }
+
   // Regular monthly amount going to a debt from Halifax bills.
   function monthlyFor(debtId, state) {
     return sum((state.bills || []).filter(b => live(b) && !b.once && b.debtId === debtId));
@@ -535,8 +584,13 @@ const Engine = (() => {
     const m = (state.months && state.months[id]) || {};
     const per = period(id, state);
 
+    // The Halifax balance is a snapshot on the day it was typed. Bills before that day have gone.
+    const pay = m.pay || 0;
+    const entered = m.halifax != null;
+    const ref = entered && m.halifaxAt && m.halifaxAt > per.payday ? m.halifaxAt : per.payday;
+
     // What has to stay in Halifax: the rest of this month plus all of next month
-    const rest = billsBetween(state, per.payday, per.monthEnd, true);
+    const rest = billsBetween(state, ref, per.monthEnd, true);
     const next = billsBetween(state, per.nextStart, per.nextEnd, true);
     const restTotal = sum(rest);
     const nextTotal = sum(next);
@@ -544,10 +598,24 @@ const Engine = (() => {
     const keep = restTotal + nextTotal + buffer;
 
     // What is there. Without a Halifax balance, assume last month kept back exactly enough.
-    const pay = m.pay || 0;
-    const entered = m.halifax != null;
     const halifax = entered ? m.halifax : pay + restTotal + buffer;
-    const free = halifax - keep;
+
+    // Money owed back to you: counted now only if Halifax can still pay every bill until it lands
+    const owed = entered ? owedAt(state, ref) : [];
+    const owedTotal = sum(owed);
+    let owedCounted = 0, owedRisk = null, owedLow = null, owedUntil = null;
+    if (owedTotal > 0) {
+      owedUntil = owed.map(o => o.expected || per.nextPayday).sort().pop();
+      let run = keep - owedTotal, low = run, at = null;
+      for (const l of [...rest, ...next]) {
+        if (l.skipped || l.date > owedUntil) continue;
+        run -= l.amount;
+        if (run < low) { low = run; at = l; }
+      }
+      if (low >= 0) { owedCounted = owedTotal; owedLow = low; }
+      else owedRisk = { date: at.date, name: at.name, short: -low };
+    }
+    const free = halifax + owedCounted - keep;
 
     // Monzo for next month: weekly amounts times the weeks, with any changes for this month only
     const mondays = weeksIn(per.nextId, s.weekDay == null ? 1 : s.weekDay);
@@ -605,7 +673,8 @@ const Engine = (() => {
     const debtTotal = debts.reduce((t, d) => t + d.now, 0);
     const pendingDebt = (ticks['x:debt'] ? 0 : extra) + sum(transfers.filter(t => t.debtId && !ticks[t.key]));
     const debtAfter = Math.max(0, debtTotal - pendingDebt);
-    const net = savingsAfter - debtAfter;
+    const owedPending = owedRisk && !ticks['o:later'] ? owedTotal : 0;
+    const net = savingsAfter - debtAfter + owedPending;
     const debtNextMonth = debts.reduce((t, d) => t + d.nextMonth, 0) + extra;
 
     const reimb = (state.bills || []).filter(b => live(b) && b.reimbursed && !b.once);
@@ -615,16 +684,21 @@ const Engine = (() => {
     let todayCheck = null;
     if (today >= per.payday && today <= per.end) {
       const still = billsBetween(state, today, per.nextEnd);
-      todayCheck = { required: sum(still) + buffer, count: still.length, dueToday: sum(still.filter(l => l.date === today)) };
+      todayCheck = { required: sum(still) + buffer, count: still.length, dueToday: sum(still.filter(l => l.date === today)), owed: sum(owedAt(state, today)) };
     }
 
-    let run = keep;
-    const timeline = [...rest, ...next].filter(l => !l.skipped).map(l => { run -= l.amount; return { ...l, after: run }; });
+    // Bill by bill from the payday moves, including the day any counted money comes back
+    const flow = [...rest, ...next].filter(l => !l.skipped);
+    if (owedCounted) flow.push({ key: 'owed-in', name: 'Owed back to you', amount: -owedCounted, date: owedUntil, inflow: true });
+    flow.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a.inflow ? 1 : 0) - (b.inflow ? 1 : 0)));
+    let run = keep - owedCounted;
+    const timeline = flow.map(l => { run -= l.amount; return { ...l, after: run }; });
 
-    const balanced = leftover < 0 || keep + monzo + transfersTotal + extra + toSavings === halifax + fromSavings;
+    const balanced = leftover < 0 || keep + monzo + transfersTotal + extra + toSavings === halifax + owedCounted + fromSavings;
 
     return {
-      period: per, pay, halifax, entered, rest, next, restTotal, nextTotal, buffer, keep, free,
+      period: per, ref, pay, halifax, entered, rest, next, restTotal, nextTotal, buffer, keep, free,
+      owed, owedTotal, owedCounted, owedRisk, owedLow, owedUntil, owedPending,
       weeks, mondays, autoWeeks: mondays.length, pots, shop, spend, monzo, transfers, transfersTotal,
       fromSavings, leftover, extra, extraDebt, toSavings, debts, debtTotal, debtAfter, savingsNow, savingsAfter, net,
       debtNextMonth, reimb, reimbTotal, todayCheck, timeline, balanced,
@@ -634,7 +708,7 @@ const Engine = (() => {
 
   return {
     iso, toDate, fromDate, addDays, diffDays, shiftMonth, daysInMonth, clampDay, monthEnd,
-    nominalPayday, paydayOf, monthIdFor, period, weeksIn, datesInRange, billsBetween,
+    nominalPayday, paydayOf, monthIdFor, period, weeksIn, datesInRange, billsBetween, owedAt,
     monthlyFor, debtBalance, projectDebt, buildPlan
   };
 })();
@@ -643,7 +717,7 @@ const Engine = (() => {
 // ===== APP =====
 const KEY = 'financeManager.v3';
 const SYNC_KEY = 'financeManager.sync';
-const VERSION = '3.0';
+const VERSION = '3.1';
 const DATA_PATH = 'data.json';
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -688,7 +762,7 @@ function defaults() {
     settings: { payDay: 15, weekendRule: 'before', weekDay: 1, buffer: 0, savingsLabel: 'Monzo savings pot' },
     bills: [], budgets: [], transfers: [], debts: [],
     savings: { balance: 0, updated: '' },
-    months: {}, adjust: {},
+    months: {}, adjust: {}, owed: [],
     meta: { created: today(), updatedAt: 0, lastBackup: '' }
   };
 }
@@ -713,6 +787,7 @@ function normalise(s) {
     savings: { ...d.savings, ...(s.savings || {}) },
     months: s.months && typeof s.months === 'object' ? s.months : {},
     adjust: s.adjust && typeof s.adjust === 'object' ? s.adjust : {},
+    owed: Array.isArray(s.owed) ? s.owed : [],
     meta: { ...d.meta, ...(s.meta || {}) }
   };
 }
@@ -1035,6 +1110,9 @@ function renderPayday() {
       <button class="nav-btn" data-action="next-month" aria-label="Next payday">&#8250;</button>
     </div>
     ${noticesHtml(p)}
+    <div class="glance" id="glance"></div>
+    <div class="pay-grid">
+    <div class="col-a">
     <div class="card">
       <h2>What came in</h2>
       <div class="grid2">
@@ -1064,30 +1142,66 @@ function renderPayday() {
         </div>
       </details>
     </div>
-    <div id="planOut"></div>`;
+    <div id="planA"></div>
+    </div>
+    <div class="col-b" id="planOut"></div>
+    </div>`;
   renderPlan();
+}
+
+function glanceHtml(p) {
+  const tile = (cls, label, amount, note) => `<div class="tile ${cls}"><div class="tile-label">${label}</div><div class="tile-amount">${amount}</div><div class="tile-note">${note}</div></div>`;
+  const next = monthName(p.period.nextId);
+  return [
+    tile('halifax', 'Leave in Halifax', money(p.keep - p.owedCounted), `Every bill until ${fmtShort(p.period.nextEnd)}`),
+    tile('monzo', 'Send to Monzo', money(p.monzo + p.toSavings), `Pots for ${next}, plus savings`),
+    p.leftover < 0 ? tile('bad', 'Short this month', money(-p.leftover), 'See the fixes in your moves') : tile('good', 'Into savings', money(p.toSavings), p.extra ? `Plus ${money(p.extra)} off a debt` : `Your ${esc(state.settings.savingsLabel)}`),
+    tile(p.net >= 0 ? 'good' : 'bad', p.net >= 0 ? 'In the black' : 'In the red', money(Math.abs(p.net)), 'Savings against everything you owe')
+  ].join('');
 }
 
 function beforePayHtml(p) {
   const mn = monthName(p.period.id);
   const need = p.restTotal + p.buffer;
   if (!p.entered) {
-    return p.pay ? `<div class="status note">No Halifax balance yet, so this assumes you kept back ${money(need)} for the rest of ${mn}. Type the balance to check.</div>` : '';
+    const owedNote = (state.owed || []).some(o => !o.back) ? ' You have money owed back to you, so typing the balance matters this month.' : '';
+    return p.pay ? `<div class="status note">No Halifax balance yet, so this assumes you kept back ${money(need)} for the rest of ${mn}. Type the balance to check.${owedNote}</div>` : '';
   }
   if (!p.pay) return '';
-  const before = p.halifax - p.pay;
-  if (before >= need) return `<div class="status ok">&#10003; Before your pay, Halifax had ${money(before)}. That already covers the rest of ${mn} (${money(need)}), so you're a month ahead.</div>`;
-  return `<div class="status note">Before your pay, Halifax had ${money(before)}: ${money(need - before)} less than the rest of ${mn} needs. Part of this pay covers it.</div>`;
+  const before = p.halifax - p.pay + p.owedTotal;
+  const plus = p.owedTotal ? ` (counting the ${money(p.owedTotal)} owed back to you)` : '';
+  if (before >= need) return `<div class="status ok">&#10003; Before your pay, Halifax had ${money(before)}${plus}. That covers the rest of ${mn} (${money(need)}), so you're a month ahead.</div>`;
+  return `<div class="status note">Before your pay, Halifax had ${money(before)}${plus}: ${money(need - before)} less than the rest of ${mn} needs. Part of this pay covers it.</div>`;
+}
+
+// Expenses usually come back with a payday, but not one only days away
+function defaultBackBy(spent) {
+  let d = Engine.period(Engine.monthIdFor(spent, state), state).nextPayday;
+  if (Engine.diffDays(spent, d) < 14) d = Engine.period(Engine.monthIdFor(d, state), state).nextPayday;
+  return d;
+}
+
+const owedLink = where => addForm(`add-owed-${where}`, 'owed', "Spent from Halifax on something that's coming back?", { placeholder: 'e.g. Hotel, Leeds trip' });
+
+function owedItems(list, withAdd) {
+  const t = today();
+  const rows = list.map(o => itemRow({
+    key: '', id: o.id, name: o.name, amount: o.amount,
+    sub: `Spent ${fmtShort(o.spent)} &middot; ${o.back ? `back ${fmtShort(o.back)}` : (o.expected && o.expected < t ? `<span style="color:var(--bad)">was due ${fmtShort(o.expected)}</span>` : `due back by ${fmtShort(o.expected)}`)}`,
+    act: o.back ? 'owed-undo' : 'owed-back', label: o.back ? 'Undo' : "It's back"
+  })).join('');
+  return rows + (withAdd ? owedLink(withAdd) : '');
 }
 
 function renderPlan() {
   const out = $('#planOut');
   if (!out) return;
   const p = Engine.buildPlan(state, view.monthId, today());
-  $('#beforePay').innerHTML = beforePayHtml(p);
+  $('#beforePay').innerHTML = beforePayHtml(p) + (p.entered ? `<div style="margin-top:8px">${owedLink('pay')}</div>` : '');
   const ready = p.pay > 0 || p.entered;
+  $('#glance').innerHTML = ready ? glanceHtml(p) : '';
+  $('#planA').innerHTML = ready ? movesHtml(p) : `<div class="card"><p style="margin:0"><strong>Enter your pay or Halifax balance above</strong> to see your payday moves.</p></div>`;
   out.innerHTML = [
-    ready ? movesHtml(p) : `<div class="card"><p style="margin:0"><strong>Enter your pay or Halifax balance above</strong> to see your payday moves.</p></div>`,
     addsUpHtml(p, ready),
     ready ? standHtml(p) : '',
     todayCheckHtml(p),
@@ -1116,7 +1230,9 @@ function movesHtml(p) {
   if (p.spend) mon.push({ key: 'p:spend', title: 'Spend pot', amount: p.spend });
   if (p.toSavings) mon.push({ key: 'x:savings', title: s.savingsLabel, sub: 'Ticking this adds it to your savings figure.', amount: p.toSavings });
   if (p.reimbTotal && m.reimbLanded === false) then.push({ key: 'r:later', title: `When work's ${money(p.reimbTotal)} lands, move it to your ${s.savingsLabel}`, amount: p.reimbTotal });
-  then.push({ key: 'h:check', title: 'Halifax should now show', sub: `Enough for every bill until ${fmtShort(p.period.nextEnd)}.`, amount: p.keep, noCopy: true });
+  if (p.owedRisk) then.push({ key: 'o:later', title: `When the ${money(p.owedTotal)} owed back to you lands, move it to your ${s.savingsLabel}`, amount: p.owedTotal });
+  then.push({ key: 'h:check', title: 'Halifax should now show', amount: p.keep - p.owedCounted, noCopy: true,
+    sub: p.owedCounted ? `Plus the ${money(p.owedCounted)} owed back to you makes ${money(p.keep)}: every bill until ${fmtShort(p.period.nextEnd)}.` : `Enough for every bill until ${fmtShort(p.period.nextEnd)}.` });
 
   let short = '';
   if (p.leftover < 0) {
@@ -1142,9 +1258,9 @@ function movesHtml(p) {
     <div class="card-head"><h2>Your payday moves</h2><span class="progress-text">${done} of ${all.length} done</span></div>
     ${!p.entered ? '<p class="status note" style="margin:0 0 6px">Based on your pay. Type your Halifax balance above for exact figures.</p>' : ''}
     ${short}
-    ${hal.length ? `<div class="group-label">In the Halifax app</div>${hal.map(row).join('')}` : ''}
-    ${mon.length ? `<div class="group-label">In the Monzo app</div>${mon.map(row).join('')}` : ''}
-    <div class="group-label">Then</div>${then.map(row).join('')}
+    ${hal.length ? `<div class="group-label"><span class="dot halifax"></span>In the Halifax app</div>${hal.map(row).join('')}` : ''}
+    ${mon.length ? `<div class="group-label"><span class="dot monzo"></span>In the Monzo app</div>${mon.map(row).join('')}` : ''}
+    <div class="group-label"><span class="dot done"></span>Then</div>${then.map(row).join('')}
     <p class="hint">Tap an amount to copy it, then paste it into your banking app.</p>
   </div>`;
 }
@@ -1179,6 +1295,10 @@ function addForm(formId, kind, label, o = {}) {
       <div class="money-input"><span>&pound;</span><input id="addAmt" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
       ${kind === 'bill' ? `<input type="date" id="addDate" min="${o.min}" max="${o.max}" value="${o.min}" aria-label="Date it comes out" style="max-width:170px">` : ''}
     </div>
+    ${kind === 'owed' ? `<div class="grid2" style="margin-top:8px">
+      <div><label class="lbl" for="addDate">Spent on</label><input type="date" id="addDate" max="${today()}" value="${today()}"></div>
+      <div><label class="lbl" for="addExpected">Back by about</label><input type="date" id="addExpected" min="${today()}" value="${defaultBackBy(today())}"></div>
+    </div><p class="hint">Paid out of Halifax, coming back to Halifax: work expenses, or someone paying you back.</p>` : ''}
     ${kind === 'transfer' && state.debts.length ? `<select id="addDebt" style="margin-top:8px"><option value="">Not paying off a debt</option>${state.debts.map(d => `<option value="${esc(d.id)}">Pays off ${esc(d.name)}</option>`).join('')}</select>` : ''}
     <div class="actions"><button class="btn btn-sm" data-action="add-save" data-kind="${kind}" data-pot="${o.pot || ''}" data-section="${o.section || ''}">Add</button><button class="link" data-action="add-close">Cancel</button></div>
   </div>`;
@@ -1220,13 +1340,19 @@ function addsUpHtml(p, ready) {
   const per = p.period;
   const s = state.settings;
   const mn = monthName(per.id), nx = monthName(per.nextId);
-  const sec = (id, title, sub, amount, body) => `<details class="wf" id="${id}" ${view.open[id] ? 'open' : ''}>
-      <summary><span class="wf-label">&minus; ${title}${sub ? `<small>${sub}</small>` : ''}</span><strong>${money(amount)}</strong></summary>
+  const sec = (id, title, sub, amount, body, sign = '&minus;') => `<details class="wf" id="${id}" ${view.open[id] ? 'open' : ''}>
+      <summary><span class="wf-label">${sign} ${title}${sub ? `<small>${sub}</small>` : ''}</span><strong>${money(amount)}</strong></summary>
       <div class="wf-body">${body}</div></details>`;
   const total = (label, amount, cls) => `<div class="wf-total ${cls || ''} ${amount < 0 ? 'neg' : ''}"><span>${label}</span><strong>${amount < 0 ? '&minus;' : ''}${money(Math.abs(amount))}</strong></div>`;
   const out = [];
-  if (ready) out.push(total(p.entered ? 'Halifax balance now' : `Pay plus ${money(p.restTotal + p.buffer)} kept back`, p.halifax, 'start'));
-  out.push(sec('wf-rest', `Rest of ${mn}`, `${plural(p.rest.filter(l => !l.skipped).length, 'bill')}, ${fmtShort(per.payday)} to ${fmtShort(per.monthEnd)}`, p.restTotal, billItems(p.rest, 'rest', per.payday, per.monthEnd)));
+  if (ready) out.push(total(p.entered ? `Halifax balance${p.ref > per.payday ? ` on ${fmtShort(p.ref)}` : ' now'}` : `Pay plus ${money(p.restTotal + p.buffer)} kept back`, p.halifax, 'start'));
+  if (p.owed.length) {
+    const note = p.owedCounted
+      ? `<p class="status ok">&#10003; Counted. Halifax can pay every bill until it's back (lowest point ${money(p.owedLow)}), so your plan treats it as already here.</p>`
+      : `<p class="status note">Not counted yet: Halifax would be ${money(p.owedRisk.short)} short on ${fmtDate(p.owedRisk.date)} (${esc(p.owedRisk.name)}) before it lands. When it's back, move it to savings: it's in your moves.</p>`;
+    out.push(sec('wf-owed', 'Owed back to you', p.owedCounted ? `${plural(p.owed.length, 'item')}, counted` : `${plural(p.owed.length, 'item')}, not counted yet`, p.owedTotal, owedItems(p.owed) + note, '+'));
+  }
+  out.push(sec('wf-rest', `Rest of ${mn}`, `${plural(p.rest.filter(l => !l.skipped).length, 'bill')}, ${fmtShort(p.ref)} to ${fmtShort(per.monthEnd)}`, p.restTotal, billItems(p.rest, 'rest', p.ref, per.monthEnd)));
   out.push(sec('wf-next', `All of ${nx}`, plural(p.next.filter(l => !l.skipped).length, 'bill'), p.nextTotal, billItems(p.next, 'next', per.nextStart, per.nextEnd)));
   if (p.buffer) out.push(`<div class="wf-line"><span>&minus; Cushion</span><strong>${money(p.buffer)}</strong></div>`);
   if (!ready) {
@@ -1291,6 +1417,7 @@ function standHtml(p) {
   return `<div class="card">
     <h2>Where you stand</h2>
     ${lineHtml(state.settings.savingsLabel, p.savingsAfter, p.toSavings && !ticks['x:savings'] ? `Includes this month's ${money(p.toSavings)}` : '')}
+    ${p.owedPending ? lineHtml('Owed back to you', p.owedPending, 'Goes to savings when it lands') : ''}
     ${rows || '<p class="empty">No debts recorded.</p>'}
     ${lineHtml('Total debts', p.debtAfter, '', 'total')}
     <div class="big-result ${black ? 'r-good' : 'r-bad'}">
@@ -1310,6 +1437,7 @@ function standHtml(p) {
 function hcResultHtml(tc, actual) {
   if (actual == null) return '';
   const diff = actual - tc.required;
+  if (diff < 0 && tc.owed && actual + tc.owed >= tc.required) return `<div class="status note"><strong>${money(-diff)} under,</strong> but ${money(tc.owed)} is owed back to you, so you're covered once it lands.</div>`;
   if (diff > 0) return `<div class="status ok"><strong>${money(diff)} more than needed.</strong> That's spare if you've already done your payday moves.</div>`;
   if (diff === 0) return '<div class="status ok"><strong>Spot on.</strong></div>';
   if (tc.dueToday && -diff <= tc.dueToday) return `<div class="status note"><strong>${money(-diff)} under.</strong> Fine if today's ${money(tc.dueToday)} has already gone out.</div>`;
@@ -1330,6 +1458,8 @@ function todayCheckHtml(p) {
       <div class="money-input"><span>&pound;</span><input id="hcActual" inputmode="decimal" autocomplete="off" enterkeyhint="done" data-hc value="${fresh ? toPounds(m.check.amount) : ''}" placeholder="0.00"></div>
     </div>
     <div id="hcResult">${hcResultHtml(tc, fresh ? m.check.amount : null)}</div>
+    ${tc.owed ? `<p class="hint">${money(tc.owed)} is owed back to you.</p>` : ''}
+    <div style="margin-top:6px">${owedLink('check')}</div>
   </div>`;
 }
 
@@ -1341,8 +1471,8 @@ function timelineHtml(p) {
     <div class="table-wrap"><table>
       <thead><tr><th>Date</th><th>Bill</th><th class="amt">Amount</th><th class="amt">After</th></tr></thead>
       <tbody>
-        <tr class="minor"><td class="nowrap">${fmtDate(p.period.payday)}</td><td>After payday moves</td><td></td><td class="amt">${money(p.keep)}</td></tr>
-        ${p.timeline.map(l => `<tr class="${l.date < t ? 'past' : ''}"><td class="nowrap">${fmtDate(l.date)}</td><td>${esc(l.name)}</td><td class="amt">${money(l.amount)}</td><td class="amt">${money(l.after)}</td></tr>`).join('')}
+        <tr class="minor"><td class="nowrap">${fmtDate(p.ref)}</td><td>After payday moves</td><td></td><td class="amt">${money(p.keep - p.owedCounted)}</td></tr>
+        ${p.timeline.map(l => `<tr class="${l.date < t ? 'past' : ''}"><td class="nowrap">${fmtDate(l.date)}</td><td>${esc(l.name)}</td><td class="amt">${l.inflow ? '+' + money(-l.amount) : money(l.amount)}</td><td class="amt">${money(l.after)}</td></tr>`).join('')}
         <tr class="total"><td colspan="3">Left on ${fmtShort(p.period.nextEnd)}</td><td class="amt">${money(p.buffer)}</td></tr>
       </tbody>
     </table></div>
@@ -1364,7 +1494,7 @@ function renderMoney() {
   const oneOffs = state.bills.filter(b => b.once && b.once >= thisMonth).sort((a, b) => a.once.localeCompare(b.once) || a.day - b.day);
   const billTotal = state.bills.filter(b => live(b) && !b.once).reduce((t, b) => t + (b.amount || 0), 0);
   const budgetRow = b => entryRow('budget', b, `${b.per === 'week' ? 'A week' : 'A month'}${b.active === false ? ' &middot; Paused' : ''}`);
-  el.innerHTML = `
+  el.innerHTML = `<div class="split"><div>
     <div class="card">
       <div class="card-head"><h2>Halifax bills</h2><button class="btn btn-sm" data-action="add" data-kind="bill">Add bill</button></div>
       <p class="hint" style="margin-top:0">Everything that comes out of Halifax, with the day it goes.</p>
@@ -1376,6 +1506,7 @@ function renderMoney() {
       <p class="hint" style="margin-top:0">Added for a single month. Add more from the Payday screen.</p>
       ${oneOffs.map(b => entryRow('bill', b, billMeta(b))).join('')}
     </div>` : ''}
+    </div><div>
     <div class="card">
       <div class="card-head"><h2>Monzo pots</h2><button class="btn btn-sm" data-action="add" data-kind="budget">Add</button></div>
       <p class="hint" style="margin-top:0">Weekly amounts are multiplied by the weeks in the month.</p>
@@ -1388,7 +1519,7 @@ function renderMoney() {
       <div class="card-head"><h2>Payday transfers</h2><button class="btn btn-sm" data-action="add" data-kind="transfer">Add</button></div>
       <p class="hint" style="margin-top:0">Moved each payday, like your daughter's savings.</p>
       ${state.transfers.map(t => entryRow('transfer', t, t.active === false ? 'Paused' : '')).join('') || '<p class="empty">None yet.</p>'}
-    </div>`;
+    </div></div></div>`;
 }
 
 function billMeta(b) {
@@ -1415,7 +1546,7 @@ function renderDebts() {
   const totalDebt = debts.reduce((x, d) => x + d.now, 0);
   const sav = state.savings.balance || 0;
   const net = sav - totalDebt;
-  el.innerHTML = `
+  el.innerHTML = `<div class="cols">
     <div class="card">
       <h2>Where you stand today</h2>
       ${lineHtml(state.settings.savingsLabel, sav)}
@@ -1425,6 +1556,11 @@ function renderDebts() {
         <div class="amount">${money(Math.abs(net))}</div>
         <div class="note">${net >= 0 ? 'Money to play with after everything you owe.' : 'Keep saving and paying down to close the gap.'}</div>
       </div>
+      ${(() => {
+        const p = Engine.buildPlan(state, Engine.monthIdFor(t, state), t);
+        const pending = p.toSavings && !(((state.months[p.period.id] || {}).ticks || {})['x:savings']) && (p.pay || p.entered) ? p.toSavings : 0;
+        return pending ? `<p class="hint">Once you move this payday's ${money(pending)} into savings, you'll be ${money(Math.abs(net + pending))} ${net + pending >= 0 ? 'in the black' : 'in the red'}.</p>` : '';
+      })()}
     </div>
     <div class="card">
       <h2>${esc(state.settings.savingsLabel)}</h2>
@@ -1437,6 +1573,16 @@ function renderDebts() {
       </div>
       <p class="hint">${state.savings.updated ? 'Last updated ' + fmtDate(state.savings.updated, true) + '. ' : ''}Ticking the savings step on payday adds to this for you.</p>
     </div>
+    <div class="card">
+      <h2>Owed back to you</h2>
+      <p class="hint" style="margin-top:0">Money you've paid out of Halifax that's coming back, like work expenses. The payday plan counts it when it's safe to.</p>
+      ${(() => {
+        const t = today();
+        const list = (state.owed || []).filter(o => !o.back || Engine.diffDays(o.back, t) <= 45).sort((a, b) => (a.back ? 1 : 0) - (b.back ? 1 : 0) || a.spent.localeCompare(b.spent));
+        const out = list.filter(o => !o.back).reduce((x, o) => x + o.amount, 0);
+        return (list.length ? owedItems(list) : '<p class="empty">Nothing owed back right now.</p>') + (out ? lineHtml('Still to come back', out, '', 'total') : '') + owedLink('debts');
+      })()}
+    </div>
     ${debts.map(debtCardHtml).join('')}
     <div class="card">
       <h2>Add a debt</h2>
@@ -1447,7 +1593,7 @@ function renderDebts() {
       </div>
       <button class="btn" data-action="add-debt">Add debt</button>
       <p class="hint">To track repayments, open the bill in Bills and choose which debt it pays off.</p>
-    </div>`;
+    </div></div>`;
 }
 
 function debtCardHtml(d) {
@@ -1542,7 +1688,7 @@ function renderSettings() {
   const m = state.meta;
   const hist = Object.entries(state.months).filter(([, x]) => x.snapshot && (x.snapshot.pay || x.snapshot.halifax))
     .sort((a, b) => (a[0] < b[0] ? 1 : -1)).slice(0, 24);
-  el.innerHTML = `
+  el.innerHTML = `<div class="cols">
   ${syncCardHtml()}
   <div class="card">
     <h2>Payday</h2>
@@ -1597,6 +1743,7 @@ function renderSettings() {
     <h2>Clear this device</h2>
     <p class="hint" style="margin-top:0">Removes the planner and your key from this device only. Your private store is not touched.</p>
     <div class="actions"><button class="btn btn-danger btn-sm" data-action="reset-device">Clear this device</button></div>
+  </div>
   </div>
   <footer class="foot">Finance Manager ${VERSION}</footer>`;
 }
@@ -1700,6 +1847,9 @@ function importBackup(file) {
   reader.readAsText(file);
 }
 
+// Payday changes only need the plan redrawn; elsewhere the whole tab.
+function rerender() { if (view.tab === 'payday') renderPlan(); else renderTab(); }
+
 // Saves a change for this month only. Keys: 'b:billId:date', 'p:budgetId', 't:transferId'. null resets.
 function setAdjust(key, amount, skip) {
   const [kind, id, date] = key.split(':');
@@ -1802,14 +1952,26 @@ const actions = {
   'adj-save': b => { const v = toP($('#adjAmt').value); if (v == null || v < 0) { toast('Type an amount.'); return; } setAdjust(b.dataset.key, v); },
   'adj-skip': b => setAdjust(b.dataset.key, 0, true),
   'adj-reset': b => setAdjust(b.dataset.key, null),
-  'add-open': b => { view.add = b.dataset.form; view.adj = null; renderPlan(); const i = $('#addName'); if (i) i.focus(); },
-  'add-close': () => { view.add = null; renderPlan(); },
+  'add-open': b => { view.add = b.dataset.form; view.adj = null; rerender(); const i = $('#addName'); if (i) i.focus(); },
+  'add-close': () => { view.add = null; rerender(); },
+  'owed-back': b => { const o = state.owed.find(x => x.id === b.dataset.id); if (!o) return; o.back = today(); save(); rerender(); toast(`${o.name} marked as back`); },
+  'owed-undo': b => { const o = state.owed.find(x => x.id === b.dataset.id); if (!o) return; o.back = null; save(); rerender(); },
   'add-save': b => {
     const name = $('#addName').value.trim();
     const amount = toP($('#addAmt').value);
     if (!name || !(amount > 0)) { toast('Give it a name and an amount.'); return; }
     const m = month();
     const kind = b.dataset.kind;
+    if (kind === 'owed') {
+      const spent = $('#addDate').value || today();
+      const expected = $('#addExpected').value || null;
+      if (spent > today()) { toast('The date spent cannot be in the future.'); return; }
+      state.owed.push({ id: uid(), name, amount, spent, expected, back: null });
+      view.add = null;
+      view.open['wf-owed'] = true;
+      save(); rerender(); toast(`${name} added as owed back to you`);
+      return;
+    }
     if (kind === 'bill') {
       const date = $('#addDate').value;
       const el = $('#addDate');
@@ -1930,6 +2092,7 @@ document.addEventListener('input', e => {
     const v = toP(el.value);
     const m = month();
     m[el.dataset.monthField] = el.dataset.monthField === 'pay' ? (v > 0 ? v : null) : v;
+    if (el.dataset.monthField === 'halifax') { if (v == null) delete m.halifaxAt; else m.halifaxAt = today(); }
     if (el.dataset.monthField === 'pay') { m.payFromLast = false; if ($('#payHint')) $('#payHint').hidden = true; }
     save();
     renderPlan();
@@ -1952,7 +2115,7 @@ document.addEventListener('change', e => {
     const key = el.dataset.tick;
     const amount = Number(el.dataset.amount) || 0;
     // Savings ticks move the savings figure: in for savings and work pay-backs, out for a top-up
-    const sign = key === 'x:savings' || key === 'r:later' ? 1 : key === 'x:fromsavings' ? -1 : 0;
+    const sign = key === 'x:savings' || key === 'r:later' || key === 'o:later' ? 1 : key === 'x:fromsavings' ? -1 : 0;
     if (el.checked) {
       m.ticks[key] = { ts: Date.now(), at: today(), amount, debtId: el.dataset.debt || null };
       if (sign) state.savings = { balance: Math.max(0, (state.savings.balance || 0) + sign * amount), updated: today() };
