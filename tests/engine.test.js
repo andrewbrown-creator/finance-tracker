@@ -13,7 +13,7 @@ const Engine = new Function(`${match[1]}\nreturn Engine;`)();
 const makeState = (extra = {}) => ({
   settings: { payDay: 15, weekendRule: 'before', weekDay: 1, buffer: 0, ...(extra.settings || {}) },
   bills: extra.bills || [], budgets: extra.budgets || [], transfers: extra.transfers || [],
-  debts: extra.debts || [], savings: extra.savings || { balance: 0 }, months: extra.months || {}, adjust: extra.adjust || {}
+  debts: extra.debts || [], savings: extra.savings || { balance: 0 }, months: extra.months || {}, adjust: extra.adjust || {}, owed: extra.owed || []
 });
 const bill = (id, amount, day, more = {}) => ({ id, name: id, amount, day, active: true, ...more });
 const weekly = (id, amount, pot = 'shop') => ({ id, name: id, amount, per: 'week', pot, active: true });
@@ -277,6 +277,57 @@ test('a short month can be topped up from savings and still adds up', () => {
   assert.strictEqual(q.leftover, 0);
   assert.ok(q.balanced);
   assert.strictEqual(q.savingsAfter, 25000);
+});
+
+// ---- Money owed back, and balances typed after payday ----
+const owedBills = () => [bill('Rent', 115000, 16), bill('Energy', 8000, 1)];
+test('a balance typed after rent has gone only counts the bills still to come', () => {
+  const s = makeState({ bills: owedBills(), months: { '2026-10': { pay: 300000 } } });
+  s.months['2026-10'].halifax = 115000 + 8000 + 300000;   // typed on payday: rest of Oct (rent) + Nov (energy, rent)
+  const onPayday = Engine.buildPlan(s, '2026-10', '2026-10-15');
+  s.months['2026-10'] = { pay: 300000, halifax: 8000 + 300000, halifaxAt: '2026-10-20' }; // typed after rent went on the 16th
+  const later = Engine.buildPlan(s, '2026-10', '2026-10-20');
+  assert.strictEqual(later.restTotal, 0);
+  assert.strictEqual(later.free, onPayday.free);
+});
+test('money owed back is counted when Halifax can pay every bill until it lands', () => {
+  // A month ahead, but £300 of a work trip was paid from Halifax before payday
+  const s = makeState({ bills: owedBills(), owed: [{ id: 'h', name: 'Hotel', amount: 30000, spent: '2026-10-10', expected: '2026-11-13' }],
+    months: { '2026-10': { pay: 300000, halifax: 115000 + 300000 - 30000 } } });
+  const p = Engine.buildPlan(s, '2026-10', '2026-10-15');
+  assert.strictEqual(p.owedCounted, 30000);
+  assert.strictEqual(p.free, 300000 - 123000); // same as if the trip had never been paid
+  assert.ok(p.balanced);
+  assert.strictEqual(p.timeline.find(l => l.inflow).amount, -30000);
+  assert.strictEqual(p.timeline[p.timeline.length - 1].after, 0);
+});
+test('money owed back is not counted if a bill would bounce before it lands', () => {
+  // Not due back until 20 Nov, after November's rent on the 16th, and nothing spare to cover the gap
+  const s = makeState({ bills: owedBills(), owed: [{ id: 'h', name: 'Hotel', amount: 30000, spent: '2026-10-10', expected: '2026-11-20' }],
+    months: { '2026-10': { pay: 0, halifax: 115000 + 123000 - 30000 } } });
+  const p = Engine.buildPlan(s, '2026-10', '2026-10-15');
+  assert.strictEqual(p.owedCounted, 0);
+  assert.strictEqual(p.owedRisk.name, 'Rent');
+  assert.strictEqual(p.owedRisk.date, '2026-11-16');
+  assert.strictEqual(p.leftover, -30000); // shows as short, so the one-tap fixes appear
+  assert.strictEqual(p.owedPending, 30000);
+});
+test('marking money as back later does not change a plan already made', () => {
+  const s = makeState({ bills: owedBills(), owed: [{ id: 'h', name: 'Hotel', amount: 30000, spent: '2026-10-10', expected: '2026-11-13' }],
+    months: { '2026-10': { pay: 300000, halifax: 385000, halifaxAt: '2026-10-15' } } });
+  const before = Engine.buildPlan(s, '2026-10', '2026-10-15');
+  s.owed[0].back = '2026-10-28';
+  const after = Engine.buildPlan(s, '2026-10', '2026-10-28');
+  assert.strictEqual(after.free, before.free);
+  assert.strictEqual(after.toSavings, before.toSavings);
+  assert.strictEqual(after.todayCheck.owed, 0);
+});
+test('money spent after the balance was taken is left out of that plan but shows in the Halifax check', () => {
+  const s = makeState({ bills: owedBills(), owed: [{ id: 't', name: 'Train', amount: 9000, spent: '2026-10-22', expected: '2026-11-13' }],
+    months: { '2026-10': { pay: 300000, halifax: 415000, halifaxAt: '2026-10-15' } } });
+  const p = Engine.buildPlan(s, '2026-10', '2026-10-25');
+  assert.strictEqual(p.owedTotal, 0);
+  assert.strictEqual(p.todayCheck.owed, 9000);
 });
 
 // ---- Mid-month check ----
