@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "ArtifactData",
+      "mcp__Notion__notion-fetch",
+      "mcp__Notion__notion-query-data-sources",
+      "mcp__Notion__notion-query-meeting-notes",
+      "mcp__Notion__notion-create-pages",
+      "mcp__Notion__notion-update-page",
+      "mcp__Slack__slack_search_public_and_private",
+      "mcp__Slack__slack_read_channel",
+      "mcp__Slack__slack_read_thread",
+      "mcp__Slack__slack_send_message",
+      "mcp__Gmail__search_threads",
+      "mcp__Gmail__get_thread",
+      "mcp__Google_Calendar__list_events",
+      "mcp__HubSpot__search_crm_objects",
+      "mcp__HubSpot__search_owners",
+      "mcp__Linear__get_notifications",
+      "mcp__Linear__list_issues",
+      "mcp__Linear__list_projects",
+      "mcp__Linear__get_status_updates",
+      "mcp__Linear__list_comments"
+    ]
+  }
+}
